@@ -9,7 +9,7 @@ from typing import Sequence, Union
 import attr
 import numpy as np  # type: ignore
 
-from robot import Robot
+from model import RobotModel
 from geometry import matrix_2_vector, position_from_matrix, vector_2_matrix
 
 
@@ -33,7 +33,7 @@ def _validate_transform_mask(mask, name, size):
 class OptimizationHandler:
     """Handler for optimization tasks."""
 
-    robot = attr.ib(type=Robot)
+    robot = attr.ib(type=RobotModel)
     kinematic_chain_mask = attr.ib(False, type=Union[bool, Sequence[bool]])
     tool_mask = attr.ib(False, type=Union[bool, Sequence[bool]])
     world_mask = attr.ib(False, type=Union[bool, Sequence[bool]])
@@ -101,7 +101,7 @@ def optimize_accuracy(optimization_vector, handler, qs, positions):
     :param positions: Sequence[Sequence[float]]
     """
     handler.apply_optimization_vector(optimization_vector)
-    errors = compute_absolute_errors(qs=qs, positions=positions, robot=handler.robot)
+    errors = compute_absolute_errors(qs=qs, positions=positions, robot=handler.commander)
     return errors
 
 

@@ -2,7 +2,7 @@
 # @author Anqi Li
 # @date April 8, 2019
 
-from rmp_root import RMPNode, RMPRoot, RMPLeaf
+from _root import RMPNode, RMPRoot, RMPLeaf
 import numpy as np
 from numpy.linalg import norm
 
@@ -226,8 +226,20 @@ class GoalAttractorUni(RMPLeaf):
     """
 
     def __init__(self, name, parent, y_g, w_u=10, w_l=1, sigma=1,
-                 alpha=1, eta=2, gain=1, tol=0.005):
+                 alpha=1, eta=2, gain=3, tol=0.005):
+        """
 
+        :param name:
+        :param parent:
+        :param y_g:
+        :param w_u:
+        :param w_l:
+        :param sigma:
+        :param alpha:
+        :param eta:
+        :param gain: desired acceleration gain with unit (rad/s)
+        :param tol: tolerance for considering reached the position
+        """
         if y_g.ndim == 1:
             y_g = y_g.reshape(-1, 1)
         N = y_g.size
@@ -245,8 +257,6 @@ class GoalAttractorUni(RMPLeaf):
 
             G = w * np.eye(N)
             if x_norm > tol:
-                # tol: tolerance for considering reached the position
-                # gain: desired acceleration gain
                 grad_Phi = s / x_norm * w * x * gain
             else:
                 grad_Phi = 0

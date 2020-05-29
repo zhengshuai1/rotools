@@ -3,8 +3,8 @@
 # @date April 8, 2019
 
 
-from rmp_root import RMPRoot
-from rmp_leaf import CollisionAvoidance, GoalAttractorUni
+from _root import RMPRoot
+from _leaf import CollisionAvoidance, GoalAttractorUni
 
 import numpy as np
 from numpy.linalg import norm
@@ -29,7 +29,7 @@ x = np.array([2.5, -2, -1])  # init position
 x_dot = np.array([0, 0, 0])  # init velocity
 
 state_0 = np.concatenate((x, x_dot), axis=None)
-print(state_0)
+print(state_0.reshape(2, -1))
 
 
 # dynamics

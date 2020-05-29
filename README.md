@@ -2,9 +2,21 @@
 
 A robot toolbox belongs to the **Ro** series
 
-## SeRoTools
+## File structure
 
-Toolbox for serial manipulators (robot arms)
+#### policy
+
+Policies for path motion planning
+
+#### robot
+
+Control models for different kinds of robots
+
+**serial**: control model for serial manipulators (robot arms)
+
+#### utility
+
+Utilities for general function
 
 ## Coding Guide
 

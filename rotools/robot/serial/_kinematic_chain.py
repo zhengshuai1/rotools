@@ -7,7 +7,7 @@ import attr
 import numpy as np  # type: ignore
 
 from json_encoder import JSONEncoder
-from link import Link, MDHLink, RevoluteMDHLink
+from _link import Link, MDHLink, RevoluteMDHLink
 
 # set logging
 logger = logging.getLogger(__name__)

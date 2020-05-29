@@ -3,17 +3,13 @@ from typing import Sized
 
 import numpy as np  # type: ignore
 import scipy.optimize  # type: ignore
-from rmp import rmp_planner
 
 from attr import attrs, attrib, Factory
 from json_encoder import JSONEncoder
-from kinematic_chain import MDHKinematicChain
-from tool import Tool
-from geometry import vector_2_matrix
+from _kinematic_chain import MDHKinematicChain
+from _tool import Tool
 
-
-def _init_planner(robot):
-    return rmp_planner.RMPPlanner(len(robot.kinematic_chain))
+from rotools.utility import common
 
 
 def _ndof_zeros_factory(robot):
@@ -29,21 +25,17 @@ def _joint_vel_limits_factory(robot):
 
 
 def _joint_limits_factory(robot):
-    return np.repeat((-np.pi, np.pi), len(robot.kinematic_chain)).reshape((2, -1))
+    return np.repeat((-2*np.pi, 2*np.pi), len(robot.kinematic_chain)).reshape((2, -1))
 
 
 @attrs
-class Robot(Sized):
+class RobotModel(Sized):
     """Robot manipulator class."""
 
     kinematic_chain = attrib(type=MDHKinematicChain)
     tool = attrib(factory=lambda: Tool(), type=Tool)
     world_frame = attrib(factory=lambda: np.eye(4), type=np.ndarray)
 
-    _planner = attrib(
-        default=Factory(factory=_init_planner, takes_self=True),
-        type=rmp_planner.RMPPlanner,
-    )
     random_state = attrib(
         factory=lambda: np.random.RandomState(),
         type=np.random.RandomState,
@@ -107,14 +99,15 @@ class Robot(Sized):
 
         return pose
 
-    def ik(self, pose, q=None):
+    def ik(self, pose, q):
         """Solve the inverse kinematics.
 
         :param pose: 4x4 transformation matrix
-        :param q: Optional[Sequence[float]]
+        :param q: Sequence[float] the current joint state
         """
-        x0 = self.joints if q is None else q
-        result = scipy.optimize.least_squares(fun=_ik_cost_function, x0=x0,
+        pose = common.sd_pose(pose)
+        self.joints = q
+        result = scipy.optimize.least_squares(fun=_ik_cost_function, x0=q,
                                               bounds=self.joint_limits, args=(pose, self))
 
         if result.success:  # pragma: no cover
@@ -122,38 +115,6 @@ class Robot(Sized):
             if np.allclose(actual_pose, pose, atol=1e-3):
                 return result.x
         return None
-
-    def ik_xyz_rpy(self, xyz_rpy):
-        """Solve the ik given target pose as a vector
-
-        :param xyz_rpy: ndarray [tx, ty, tz, roll, pitch, yaw]
-        :return: ndarray joints
-        """
-        pose_matrix = vector_2_matrix(xyz_rpy, 'xyz')
-        return self.ik(pose_matrix)
-
-    def plan(self, goal, state=None, obstacles=None):
-        """Plan a trajectory basing on current state and obstacle info
-
-        :param goal: Sequence[float] Goal position in task space
-        :param state: Sequence[x, xdot] current joint position and velocity pairs,
-        if None is given, use current joints and velocities
-        :param obstacles: in task space
-        :return:
-        """
-        if state is None:
-            state = np.concatenate((self.joints, self.joint_velocities), axis=None)
-
-        assert goal is not None
-        self._planner.init(state, goal)
-        sol = self._planner.plan([0, 50])
-        if sol:
-            trajectory_positions = sol.y[:self.dof, :]  # shape (dof, N), N is the way point number
-            trajectory_velocities = sol.y[self.dof:, :]
-            trajectory_timestamps = sol.t
-            return trajectory_positions, trajectory_velocities, trajectory_timestamps
-        else:
-            return None
 
     @property
     def dof(self):

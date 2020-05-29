@@ -76,7 +76,7 @@ def position_from_matrix(matrix):
     return matrix[:-1, -1]
 
 
-def matrix_2_vector(matrix, convention = OrientationConvention.EULER_ZYX):
+def matrix_2_vector(matrix, convention=OrientationConvention.EULER_ZYX):
     """Convert 4x4 matrix to a vector."""
     # call function
     try:
