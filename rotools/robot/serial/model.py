@@ -99,6 +99,7 @@ class RobotModel(Sized):
 
         :param pose: 4x4 transformation matrix
         :param q: Sequence[float] the current joint state
+        :return ndarray or None
         """
         pose = common.sd_pose(pose)
         self.joints = q

@@ -111,14 +111,14 @@ def ros_pose(pose):
 
 def ros_plan(t, p, v=None, a=None):
     """Convert a plan to ros MoveItMsg.RobotTrajectory msg.
-    Note that the msg contains no joint name or header, which need
+    Note that the msg contains no joint name, which need
     to be added explicitly.
 
     :param t: timestamp of shape N
     :param p: way point positions of shape [dim, N]
-    :param v: way point velocities of shape [dim, N]
-    :param a: way point accelerations of shape [dim, N], if both p and v are given, a could be 0
-    :return: MoveItMsg.RobotTrajectory
+    :param v: way point velocities of shape [dim, N], could be all 0
+    :param a: way point accelerations of shape [dim, N], could be all 0
+    :return: MoveItMsg.RobotTrajectory with joint names be empty
     """
     msg = MoveItMsg.RobotTrajectory()
     way_point_num = t.size
@@ -127,7 +127,7 @@ def ros_plan(t, p, v=None, a=None):
 
     for w in range(way_point_num):
         if w == 0:
-            continue
+            continue  # omit the starting point identical to the current pose
         wpt = TrajectoryMsg.JointTrajectoryPoint()
 
         wpt.positions = list(p[:, w])

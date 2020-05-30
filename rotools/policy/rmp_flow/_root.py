@@ -91,17 +91,13 @@ class RMPNode:
 
 
 class RMPRoot(RMPNode):
-    """
-    A root node
-    """
+    """A root node"""
 
     def __init__(self, name):
         RMPNode.__init__(self, name, None, None, None, None)
 
     def set_root_state(self, x, x_dot):
-        """
-        set the state of the root node for pushforward
-        """
+        """Set the state of the root node for pushforward"""
 
         assert x.ndim == 1 or x.ndim == 2
         assert x_dot.ndim == 1 or x_dot.ndim == 2
@@ -125,9 +121,7 @@ class RMPRoot(RMPNode):
         [child.pushforward() for child in self.children]
 
     def resolve(self):
-        """
-        compute the canonical-formed RMP
-        """
+        """compute the canonical-formed RMP."""
 
         if self.verbose:
             print('%s: resolve' % self.name)
@@ -136,9 +130,7 @@ class RMPRoot(RMPNode):
         return self.a
 
     def solve(self, x, x_dot):
-        """
-        given the state of the root, solve for the controls
-        """
+        """Given the state of the root, solve for the controls."""
 
         self.set_root_state(x, x_dot)
         self.pushforward()

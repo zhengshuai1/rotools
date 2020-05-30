@@ -275,9 +275,7 @@ class GoalAttractorUni(RMPLeaf):
         RMPLeaf.__init__(self, name, parent, None, psi, J, J_dot, RMP_func)
 
     def update_goal(self, y_g):
-        """
-        update the position of the goal
-        """
+        """Update the position of the goal."""
 
         if y_g.ndim == 1:
             y_g = y_g.reshape(-1, 1)

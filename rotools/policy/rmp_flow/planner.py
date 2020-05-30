@@ -1,19 +1,11 @@
 import numpy as np
 
 from typing import Sized
-from attr import attrs, attrib, Factory
+from attr import attrs, attrib
 from scipy.integrate import solve_ivp
 
 from _root import RMPRoot
 from _leaf import GoalAttractorUni
-
-
-def _init_state_factory(planner):
-    return np.zeros((2, planner.dim))
-
-
-def _init_goal_factory(planner):
-    return np.zeros((2, planner.dim))
 
 
 @attrs
@@ -24,7 +16,7 @@ class RMPPlanner(Sized):
         return self.dim
 
     dim = attrib(type=int)
-    _root = attrib(factory=lambda: RMPRoot('root'))
+    _root = None  # attrib(factory=lambda: RMPRoot('root'))
     _leaf = None
 
     def _dynamics(self, t, state):
@@ -42,10 +34,11 @@ class RMPPlanner(Sized):
         return state_dot
 
     def plan(self, state, goal, obstacle=None, span=None):
-        """
+        """Given initial robot state x xdot, where x is the eef position and xdot=0,
+        along with goal position, plan a trajectory from initial state to the goal.
 
-        :param state: initial state as Sequence[x, ..., xdot, ...]
-        :param goal: target state as List[float]
+        :param state: ndarray initial state as [x1, ..., xn, xdot1, ..., xdotn], n the dim of coord
+        :param goal: ndarray target state [gx1, gx2, ..., gxn]
         :param obstacle:
         :param span: the total execution time interval in second
         :return: Trajectory positions, velocities, timestamps
@@ -53,12 +46,14 @@ class RMPPlanner(Sized):
         if span is None:
             span = [0, 5]  # default plan a 5s trajectory
 
-        self._leaf = GoalAttractorUni('goal_attractor', self._root, goal)
+        # For now, the root and leaf need to be explicitly initialized, otherwise
+        # some temporary state will make the planning go wrong TODO figure the reason
+        self._root = RMPRoot('root')
+        self._leaf = GoalAttractorUni('goal_attractor', self._root, goal, gain=2)
         sol = solve_ivp(self._dynamics, span, state)
         if sol:
             positions = sol.y[:self.dim, :]  # shape (dof, N), N is the way point number
             velocities = sol.y[self.dim:, :]
-            # accelerations =
             timestamps = sol.t
             return timestamps, positions, velocities  # accelerations
         else:

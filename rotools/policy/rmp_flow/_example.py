@@ -1,8 +1,3 @@
-# A simple example of RMPflow: goal reaching while avoiding obstacles
-# @author Anqi Li
-# @date April 8, 2019
-
-
 from _root import RMPRoot
 from _leaf import CollisionAvoidance, GoalAttractorUni
 
