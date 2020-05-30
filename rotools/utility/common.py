@@ -36,7 +36,8 @@ def sd_joint_state():
 
 
 def sd_pose(pose):
-    """Standardize the input pose to a 4x4 transformation matrix.
+    """Standardize the input pose to the 4x4 homogeneous transformation
+    matrix in special Euclidean group SE(3).
 
     :param pose:
     :return: transformation matrix
@@ -47,13 +48,14 @@ def sd_pose(pose):
             q = pose[3:]
             tm = transform.translation_matrix(t)
             rm = transform.quaternion_matrix(q)
-            return np.dot(rm, tm)
+            # make sure to let tm left product rm
+            return np.dot(tm, rm)
         elif pose.ndim == 1 and pose.size == 6:
             t = pose[:3]
             rpy = pose[3:]
             tm = transform.translation_matrix(t)
             rm = transform.euler_matrix(rpy[0], rpy[1], rpy[2])
-            return np.dot(rm, tm)
+            return np.dot(tm, rm)
         elif pose.shape == (4, 4):
             return pose
         else:
@@ -68,6 +70,41 @@ def sd_pose(pose):
         p = pose.pose.position
         o = pose.pose.orientation
         return sd_pose(np.array([p.x, p.y, p.z, o.x, o.y, o.z, o.w]))
+    else:
+        raise NotImplementedError
+
+
+def ros_pose(pose):
+    """Convert standard pose in 4x4 matrix to ROS geometry msg pose
+
+    :param pose:
+    :return: geometry msg pose
+    """
+    if isinstance(pose, np.ndarray):
+        if pose.shape == (4, 4):
+            t = transform.translation_from_matrix(pose)
+            q = transform.quaternion_from_matrix(pose)
+            msg = GeometryMsg.Pose()
+            msg.position.x = t[0]
+            msg.position.y = t[1]
+            msg.position.z = t[2]
+            msg.orientation.x = q[0]
+            msg.orientation.y = q[1]
+            msg.orientation.z = q[2]
+            msg.orientation.w = q[3]
+            return msg
+        elif pose.size == 7:
+            msg = GeometryMsg.Pose()
+            msg.position.x = pose[0]
+            msg.position.y = pose[1]
+            msg.position.z = pose[2]
+            msg.orientation.x = pose[3]
+            msg.orientation.y = pose[4]
+            msg.orientation.z = pose[5]
+            msg.orientation.w = pose[6]
+            return msg
+        else:
+            raise NotImplementedError
     else:
         raise NotImplementedError
 

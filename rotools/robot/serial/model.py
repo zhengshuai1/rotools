@@ -74,17 +74,12 @@ class RobotModel(Sized):
         encoder = JSONEncoder(sort_keys=True)
         return encoder.encode(self)
 
-    def fk(self, q=None):
-        """
-        Compute the forward kinematics of a given position.
+    def fk(self, q):
+        """Compute the forward kinematics of a given joint state.
 
-        Uses the current position if None is given.
-        :param q: Optional[Sequence[float]]
+        :param q: Sequence[float]
         :return: 4x4 transform matrix of the FK pose
         """
-        # validate
-        q = self.joints if q is None else q
-
         # gather transforms
         # noinspection PyListCreation
         transforms = []
