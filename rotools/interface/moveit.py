@@ -54,7 +54,7 @@ class MoveGroupInterface(object):
         print(commander.get_current_state())
 
         # Misc variables
-        self.box_name = ''
+        self.attached_object_name = ''
         self.commander = commander
         self.scene = scene
         self.move_group = move_group
@@ -161,7 +161,7 @@ class MoveGroupInterface(object):
     def execute_plan(self, plan):
         self.move_group.execute(plan, wait=True)
 
-    def wait_for_state_update(self, box_is_known=False, box_is_attached=False, timeout=4):
+    def wait_for_state_update(self, name_is_known=False, obj_is_attached=False, timeout=4):
         ## BEGIN_SUB_TUTORIAL wait_for_scene_update
         ##
         ## Ensuring Collision Updates Are Received
@@ -177,15 +177,15 @@ class MoveGroupInterface(object):
         seconds = rospy.get_time()
         while (seconds - start < timeout) and not rospy.is_shutdown():
             # Test if the box is in attached objects
-            attached_objects = self.scene.get_attached_objects([self.box_name])
+            attached_objects = self.scene.get_attached_objects([self.attached_object_name])
             is_attached = len(attached_objects.keys()) > 0
 
             # Test if the box is in the scene.
             # Note that attaching the box will remove it from known_objects
-            is_known = self.box_name in self.scene.get_known_object_names()
+            is_known = self.attached_object_name in self.scene.get_known_object_names()
 
             # Test if we are in the expected state
-            if (box_is_attached == is_attached) and (box_is_known == is_known):
+            if (obj_is_attached == is_attached) and (name_is_known == is_known):
                 return True
 
             # Sleep so that we give other threads time on the processor
@@ -199,7 +199,7 @@ class MoveGroupInterface(object):
         # Copy class variables to local variables to make the web tutorials more clear.
         # In practice, you should use the class variables directly unless you have a good
         # reason not to.
-        box_name = self.box_name
+        box_name = self.attached_object_name
         scene = self.scene
 
         ## BEGIN_SUB_TUTORIAL add_box
@@ -217,14 +217,27 @@ class MoveGroupInterface(object):
         ## END_SUB_TUTORIAL
         # Copy local variables back to class variables. In practice, you should use the class
         # variables directly unless you have a good reason not to.
-        self.box_name = box_name
-        return self.wait_for_state_update(box_is_known=True, timeout=timeout)
+        self.attached_object_name = box_name
+        return self.wait_for_state_update(name_is_known=True, timeout=timeout)
+
+    def add_sphere(self, base_link, position, radius, timeout=4):
+        self.attached_object_name = 'sphere'
+
+        sphere_pose = GeometryMsg.PoseStamped()
+        sphere_pose.header.frame_id = base_link
+        sphere_pose.pose.orientation.w = 1.0
+        sphere_pose.pose.position.x = position[0]
+        sphere_pose.pose.position.y = position[1]
+        sphere_pose.pose.position.z = position[2]
+        self.scene.add_sphere("sphere", sphere_pose, radius)
+
+        return self.wait_for_state_update(name_is_known=True, timeout=timeout)
 
     def attach_box(self, timeout=4):
         # Copy class variables to local variables to make the web tutorials more clear.
         # In practice, you should use the class variables directly unless you have a good
         # reason not to.
-        box_name = self.box_name
+        box_name = self.attached_object_name
         robot = self.commander
         scene = self.scene
         eef_link = self.eef_link
@@ -246,13 +259,13 @@ class MoveGroupInterface(object):
         ## END_SUB_TUTORIAL
 
         # We wait for the planning scene to update.
-        return self.wait_for_state_update(box_is_attached=True, box_is_known=False, timeout=timeout)
+        return self.wait_for_state_update(obj_is_attached=True, name_is_known=False, timeout=timeout)
 
     def detach_box(self, timeout=4):
         # Copy class variables to local variables to make the web tutorials more clear.
         # In practice, you should use the class variables directly unless you have a good
         # reason not to.
-        box_name = self.box_name
+        box_name = self.attached_object_name
         scene = self.scene
         eef_link = self.eef_link
 
@@ -265,24 +278,21 @@ class MoveGroupInterface(object):
         ## END_SUB_TUTORIAL
 
         # We wait for the planning scene to update.
-        return self.wait_for_state_update(box_is_known=True, box_is_attached=False, timeout=timeout)
+        return self.wait_for_state_update(name_is_known=True, obj_is_attached=False, timeout=timeout)
 
     def remove_box(self, timeout=4):
         # Copy class variables to local variables to make the web tutorials more clear.
         # In practice, you should use the class variables directly unless you have a good
         # reason not to.
-        box_name = self.box_name
+        box_name = self.attached_object_name
         scene = self.scene
-
-        ## BEGIN_SUB_TUTORIAL remove_object
-        ##
-        ## Removing Objects from the Planning Scene
-        ## ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-        ## We can remove the box from the world.
+        # We can remove the box from the world.
         scene.remove_world_object(box_name)
 
-        ## **Note:** The object must be detached before we can remove it from the world
-        ## END_SUB_TUTORIAL
-
+        # **Note:** The object must be detached before we can remove it from the world
         # We wait for the planning scene to update.
-        return self.wait_for_state_update(box_is_attached=False, box_is_known=False, timeout=timeout)
+        return self.wait_for_state_update(obj_is_attached=False, name_is_known=False, timeout=timeout)
+
+    def remove_obj(self, timeout=4):
+        self.scene.remove_world_object(self.attached_object_name)
+        return self.wait_for_state_update(obj_is_attached=False, name_is_known=False, timeout=timeout)

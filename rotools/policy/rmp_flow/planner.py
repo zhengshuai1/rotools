@@ -5,7 +5,7 @@ from attr import attrs, attrib
 from scipy.integrate import solve_ivp
 
 from _root import RMPRoot
-from _leaf import GoalAttractorUni
+from _leaf import GoalAttractorUni, CollisionAvoidance
 
 
 @attrs
@@ -17,7 +17,6 @@ class RMPPlanner(Sized):
 
     dim = attrib(type=int)
     _root = None  # attrib(factory=lambda: RMPRoot('root'))
-    _leaf = None
 
     def _dynamics(self, t, state):
         """the function to solve, iteratively used in solve_ivp.
@@ -34,12 +33,12 @@ class RMPPlanner(Sized):
         return state_dot
 
     def plan(self, state, goal, obstacle=None, span=None):
-        """Given initial robot state x xdot, where x is the eef position and xdot=0,
+        """Given initial robot state (x xdot), where x is the eef position and xdot=0,
         along with goal position, plan a trajectory from initial state to the goal.
 
         :param state: ndarray initial state as [x1, ..., xn, xdot1, ..., xdotn], n the dim of coord
         :param goal: ndarray target state [gx1, gx2, ..., gxn]
-        :param obstacle:
+        :param obstacle: ndarray [x, y, z, r] obstacle center (x,y,z) and radius r
         :param span: the total execution time interval in second
         :return: Trajectory positions, velocities, timestamps
         """
@@ -49,7 +48,10 @@ class RMPPlanner(Sized):
         # For now, the root and leaf need to be explicitly initialized, otherwise
         # some temporary state will make the planning go wrong TODO figure the reason
         self._root = RMPRoot('root')
-        self._leaf = GoalAttractorUni('goal_attractor', self._root, goal, gain=2)
+        leaf_goal = GoalAttractorUni('goal_attractor', self._root, goal, gain=1)
+        if obstacle is not None:
+            leaf_obs = CollisionAvoidance('collision_avoidance', self._root,
+                                          None, c=obstacle[:3], R=obstacle[3], epsilon=0.2)
         sol = solve_ivp(self._dynamics, span, state)
         if sol:
             positions = sol.y[:self.dim, :]  # shape (dof, N), N is the way point number
