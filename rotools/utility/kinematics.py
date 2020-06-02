@@ -211,7 +211,7 @@ def TransInv(T):
     return np.r_[np.c_[Rt, -np.dot(Rt, p)], [[0, 0, 0, 1]]]
 
 
-def VecTose3(V):
+def vector_to_se3(V):
     """Converts a spatial velocity vector into a 4x4 matrix in se3
     :param V: A 6-vector representing a spatial velocity
     :return: The 4x4 se3 representation of V
@@ -541,7 +541,7 @@ def FKinBody(M, Blist, thetalist):
     """
     T = np.array(M)
     for i in range(len(thetalist)):
-        T = np.dot(T, MatrixExp6(VecTose3(np.array(Blist)[:, i] * thetalist[i])))
+        T = np.dot(T, MatrixExp6(vector_to_se3(np.array(Blist)[:, i] * thetalist[i])))
     return T
 
 
@@ -574,7 +574,7 @@ def fk_in_space(M, s_list, theta_list):
     """
     T = np.array(M)
     for i in range(len(theta_list) - 1, -1, -1):
-        T = np.dot(MatrixExp6(VecTose3(np.array(s_list)[:, i] * theta_list[i])), T)
+        T = np.dot(MatrixExp6(vector_to_se3(np.array(s_list)[:, i] * theta_list[i])), T)
     return T
 
 
@@ -603,8 +603,8 @@ def JacobianBody(Blist, thetalist):
     Jb = np.array(Blist).copy().astype(np.float)
     T = np.eye(4)
     for i in range(len(thetalist) - 2, -1, -1):
-        T = np.dot(T, MatrixExp6(VecTose3(np.array(Blist)[:, i + 1] \
-                                          * -thetalist[i + 1])))
+        T = np.dot(T, MatrixExp6(vector_to_se3(np.array(Blist)[:, i + 1] \
+                                               * -thetalist[i + 1])))
         Jb[:, i] = np.dot(Adjoint(T), np.array(Blist)[:, i])
     return Jb
 
@@ -634,8 +634,8 @@ def JacobianSpace(Slist, thetalist):
     Js = np.array(Slist).copy().astype(np.float)
     T = np.eye(4)
     for i in range(1, len(thetalist)):
-        T = np.dot(T, MatrixExp6(VecTose3(np.array(Slist)[:, i - 1] \
-                                          * thetalist[i - 1])))
+        T = np.dot(T, MatrixExp6(vector_to_se3(np.array(Slist)[:, i - 1] \
+                                               * thetalist[i - 1])))
         Js[:, i] = np.dot(Adjoint(T), np.array(Slist)[:, i])
     return Js
 
@@ -862,8 +862,8 @@ def InverseDynamics(thetalist, dthetalist, ddthetalist, g, Ftip, Mlist, \
     for i in range(n):
         Mi = np.dot(Mi, Mlist[i])
         Ai[:, i] = np.dot(Adjoint(TransInv(Mi)), np.array(Slist)[:, i])
-        AdTi[i] = Adjoint(np.dot(MatrixExp6(VecTose3(Ai[:, i] * \
-                                                     -thetalist[i])), \
+        AdTi[i] = Adjoint(np.dot(MatrixExp6(vector_to_se3(Ai[:, i] * \
+                                                          -thetalist[i])), \
                                  TransInv(Mlist[i])))
         Vi[:, i + 1] = np.dot(AdTi[i], Vi[:, i]) + Ai[:, i] * dthetalist[i]
         Vdi[:, i + 1] = np.dot(AdTi[i], Vdi[:, i]) \

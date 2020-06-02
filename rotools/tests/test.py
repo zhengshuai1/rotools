@@ -20,11 +20,11 @@ class Test(unittest.TestCase):
         ur5_poe = serial_model.RobotModel.from_poe_parameters(ur5_poe_param)
 
         pose_poe = ur5_poe.fk(q)
-        print(pose_poe)
+        print('ur5 poe \n', pose_poe)
 
     def test_ur10e_fk(self):
 
-        q = [-np.pi/3, -np.pi/2, np.pi, 0, np.pi/2, 0]
+        q = [np.pi/2, 0, 0, 0, 0, 0]
 
         ur10e_poe_param = predefined.ur10e_poe_model()
         ur10e_poe = serial_model.RobotModel.from_poe_parameters(ur10e_poe_param)
