@@ -1,11 +1,14 @@
 import numpy as np
-import rospy
 
-import geometry_msgs.msg as GeometryMsg
-import moveit_msgs.msg as MoveItMsg
-import trajectory_msgs.msg as TrajectoryMsg
+try:
+    import rospy
+    import geometry_msgs.msg as GeometryMsg
+    import moveit_msgs.msg as MoveItMsg
+    import trajectory_msgs.msg as TrajectoryMsg
 
-from moveit_commander.conversions import pose_to_list
+    from moveit_commander.conversions import pose_to_list
+except ModuleNotFoundError:
+    pass
 
 from rotools.utility import transform
 

@@ -10,31 +10,54 @@ from _kinematic_chain import MDHKinematicChain
 from _tool import Tool
 
 from rotools.utility import common
+from rotools.utility import kinematics
 
 
 def _ndof_zeros_factory(robot):
-    return np.zeros(len(robot.kinematic_chain))
+    if robot.kinematic_chain:
+        dof = len(robot.kinematic_chain)
+    else:
+        dof = robot.screw_axes.shape[0]
+    return np.zeros(dof)
 
 
 def _joint_velocities_factory(robot):
-    return np.zeros(len(robot.kinematic_chain))
+    if robot.kinematic_chain:
+        dof = len(robot.kinematic_chain)
+    else:
+        dof = robot.screw_axes.shape[0]
+    return np.zeros(dof)
 
 
 def _joint_vel_limits_factory(robot):
-    return np.repeat((-np.pi/2, np.pi/2), len(robot.kinematic_chain)).reshape((2, -1))
+    if robot.kinematic_chain:
+        dof = len(robot.kinematic_chain)
+    else:
+        dof = robot.screw_axes.shape[0]
+    return np.repeat((-np.pi/2, np.pi/2), dof).reshape((2, -1))
 
 
 def _joint_limits_factory(robot):
-    return np.repeat((-2*np.pi, 2*np.pi), len(robot.kinematic_chain)).reshape((2, -1))
+    if robot.kinematic_chain:
+        dof = len(robot.kinematic_chain)
+    else:
+        dof = robot.screw_axes.shape[0]
+    return np.repeat((-2*np.pi, 2*np.pi), dof).reshape((2, -1))
 
 
 @attrs
 class RobotModel(Sized):
     """Robot manipulator class."""
 
-    kinematic_chain = attrib(type=MDHKinematicChain)
     tool = attrib(factory=lambda: Tool(), type=Tool)
     world_frame = attrib(factory=lambda: np.eye(4), type=np.ndarray)
+
+    # Used in PoE calculation
+    home_matrix = attrib(default=None)
+    screw_axes = attrib(default=None)
+
+    # Used in MDH calculation
+    kinematic_chain = attrib(default=None, type=MDHKinematicChain)
 
     random_state = attrib(
         factory=lambda: np.random.RandomState(),
@@ -62,12 +85,14 @@ class RobotModel(Sized):
     )
 
     def __len__(self):
-        """
-        Get the degrees of freedom.
+        """Get the degrees of freedom.
 
         :return: degrees of freedom
         """
-        return len(self.kinematic_chain)
+        if self.screw_axes is not None:
+            return self.screw_axes.shape[0]
+        else:
+            return len(self.kinematic_chain)
 
     def to_json(self):
         """Encode robot model as JSON."""
@@ -80,17 +105,18 @@ class RobotModel(Sized):
         :param q: Sequence[float]
         :return: 4x4 transform matrix of the FK pose
         """
-        # gather transforms
-        # noinspection PyListCreation
-        transforms = []
-        transforms.append(self.world_frame)
-        transforms.extend(self.kinematic_chain.transforms(q))
-        transforms.append(self.tool.matrix)
+        if self.home_matrix is not None:
+            pose = kinematics.fk_in_space(self.home_matrix, self.screw_axes, q)
+        else:
+            transforms = []
+            transforms.append(self.world_frame)
+            transforms.extend(self.kinematic_chain.transforms(q))
+            transforms.append(self.tool.matrix)
 
-        # matrix multiply through transforms
-        pose = np.eye(4, dtype=float)
-        for t in transforms:
-            pose = np.dot(pose, t)
+            # matrix multiply through transforms
+            pose = np.eye(4, dtype=float)
+            for t in transforms:
+                pose = np.dot(pose, t)
 
         return pose
 
@@ -285,11 +311,16 @@ class RobotModel(Sized):
             return q
 
     @classmethod
-    def from_parameters(cls, parameters):
+    def from_mdh_parameters(cls, parameters):
         """Construct Robot from Kinematic Chain parameters."""
         # FIXME: assumes MDH revolute robot
         kc = MDHKinematicChain.from_parameters(parameters)
         return cls(kinematic_chain=kc)
+
+    @classmethod
+    def from_poe_parameters(cls, parameters):
+        """Construct robot model from product of exponentials parameters."""
+        return cls(home_matrix=parameters[0], screw_axes=parameters[1])
 
 
 def _ik_cost_function(q, pose, robot):
