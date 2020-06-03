@@ -1,3 +1,5 @@
+# Note that this is just a example for interacting with MoveIt in ROS
+
 from __future__ import print_function
 
 import sys
