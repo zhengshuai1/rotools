@@ -25,12 +25,12 @@ class MoveGroupInterface(object):
 
         # Instantiate a `RobotCommander`_ object. Provides information such as the robot's
         # kinematic model and the robot's current joint states
-        commander = moveit_commander.RobotCommander()
+        self.commander = moveit_commander.RobotCommander()
 
         # Instantiate a `PlanningSceneInterface`_ object.  This provides a remote interface
         # for getting, setting, and updating the robot's internal understanding of the
         # surrounding world:
-        scene = moveit_commander.PlanningSceneInterface()
+        self.scene = moveit_commander.PlanningSceneInterface()
 
         # Instantiate a `MoveGroupCommander`_ object.  This object is an interface
         # to a planning group (group of joints).  In this tutorial the group is the primary
@@ -38,42 +38,35 @@ class MoveGroupInterface(object):
         # If you are using a different robot, change this value to the name of your robot
         # arm planning group.
         # This interface can be used to plan and execute motions:
-        group_name = "panda_arm"
-        move_group = moveit_commander.MoveGroupCommander(group_name)
+        self.group_name = "panda_arm"
+        self.move_group = moveit_commander.MoveGroupCommander(self.group_name)
 
         # Create a `DisplayTrajectory`_ ROS publisher which is used to display
         # trajectories in Rviz:
-        display_trajectory_publisher = rospy.Publisher('/move_group/display_planned_path',
-                                                       MoveItMsg.DisplayTrajectory,
-                                                       queue_size=20)
+        self.display_trajectory_publisher = rospy.Publisher('/move_group/display_planned_path',
+                                                            MoveItMsg.DisplayTrajectory,
+                                                            queue_size=20)
 
         # We can get the name of the reference frame for this robot:
-        planning_frame = move_group.get_planning_frame()
+        self.planning_frame = self.move_group.get_planning_frame()
 
         # We can also print the name of the end-effector link for this group:
-        eef_link = move_group.get_end_effector_link()
+        self.eef_link = self.move_group.get_end_effector_link()
 
         # We can get a list of all the groups in the robot:
-        group_names = commander.get_group_names()
+        group_names = self.commander.get_group_names()
 
         # Sometimes for debugging it is useful to print the entire state of the robot:
-        print(commander.get_current_state())
+        print(self.commander.get_current_state())
 
         # Misc variables
         self.attached_object_name = ''
-        self.commander = commander
-        self.scene = scene
-        self.move_group = move_group
-        self.display_trajectory_publisher = display_trajectory_publisher
-        self.planning_frame = planning_frame
-        self.eef_link = eef_link
-        self.group_names = group_names
 
     def get_active_joint_names(self):
         return self.move_group.get_active_joints()
 
     def get_joint_state(self):
-        """Get joint states for the robot
+        """Get joint states of the robot
 
         :return: List[float]
         """

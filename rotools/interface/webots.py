@@ -1,43 +1,97 @@
-# This example use UR10e robot simulated in Webots
+from __future__ import print_function
 
-"""my_controller controller."""
+import time
 
-# You may need to import some classes of the controller module. Ex:
-#  from controller import Robot, Motor, DistanceSensor
-from controller import Robot, Motor
+# Webots controller lib
+from controller import Supervisor
 
-# create the Robot instance.
-robot = Robot()
-ur5_motor_shoulder_pan_joint = Motor('shoulder_pan_joint')
+from rotools.utility import common
 
-# get the time step of the current world.
-timestep = int(robot.getBasicTimeStep())
 
-# You should insert a getDevice-like function in order to get the
-# instance of a device of the robot. Something like:
+class WebotsInterfaceUR(object):
+    """Interface for performing UR series robot simulation in Webots."""
 
-#  ds = robot.getDistanceSensor('dsname')
-#  ds.enable(timestep)
+    def __init__(self):
+        super(WebotsInterfaceUR, self).__init__()
 
-# Main loop:
-# - perform simulation steps until Webots is stopping the controller
-pos = 0.
-forward = True
-while robot.step(timestep) != -1:
-    # Read the sensors:
-    # Enter here functions to read sensor data, like:
-    #  val = ds.getValue()
+        self.robot = Supervisor()
+        print('Robot name: ', self.robot.getName())
 
-    # Process sensor data here.
+        # self.eef_node = self.robot.getFromDef('UR10_TCP')
 
-    # Enter here functions to send actuator commands, like:
-    pos = pos + 0.1 if forward else pos - 0.1
-    ur5_motor_shoulder_pan_joint.setPosition(pos)
-    ur5_motor_shoulder_pan_joint.setVelocity(3)  # maxvel = 3.14
-    if pos >= 3.0:
-        forward = False
-    if pos <= -3.0:
-        forward = True
-    pass
+        self.time_step = int(self.robot.getBasicTimeStep())
 
-# Enter here exit cleanup code.
+        # modify this according to robot configuration
+        self.motors = [
+            self.robot.getMotor('shoulder_pan_joint'),
+            self.robot.getMotor('shoulder_lift_joint'),
+            self.robot.getMotor('elbow_joint'),
+            self.robot.getMotor('wrist_1_joint'),
+            self.robot.getMotor('wrist_2_joint'),
+            self.robot.getMotor('wrist_3_joint'),
+        ]
+        # the position sensors must be enabled before usage
+        self._set_joint_position_sensor(enabled=True)
+        self.set_joint_max_velocity(0.5)
+
+    def get_joint_state(self):
+        """Get joint states of the robot
+
+        :return: List[float]
+        """
+        joint_states = []
+        for motor in self.motors:
+            try:
+                js = motor.getPositionSensor().getValue()
+                joint_states.append(js)
+            except NotImplementedError:
+                pass
+        return joint_states
+
+    def go_to_joint_state(self, joint_goal):
+        """Set the joint states as desired.
+
+        :param joint_goal: List[float] joint state in rad
+        :return:
+        """
+        for i, goal in enumerate(joint_goal):
+            try:
+                self.motors[i].setPosition(goal)
+            except ValueError:
+                pass
+
+        c = 1000
+        while c > 0:
+            if common.all_close(self.get_joint_state(), joint_goal, 1e-3):
+                break
+            time.sleep(0.1)
+            c -= 1
+
+    def _set_joint_position_sensor(self, enabled=True):
+        """Enable/disable position sensors of the joints.
+
+        """
+        for motor in self.motors:
+            try:
+                js_sensor = motor.getPositionSensor()
+                js_sensor.enable(self.time_step)
+            except NotImplementedError:
+                pass
+
+    def set_joint_max_velocity(self, velocity):
+        """
+
+        """
+        if isinstance(velocity, list):
+            for i, vel in enumerate(velocity):
+                try:
+                    self.motors[i].setVelocity(vel)
+                except ValueError:
+                    pass
+        else:
+            for motor in self.motors:
+                try:
+                    motor.setVelocity(velocity)
+                except ValueError:
+                    pass
+
