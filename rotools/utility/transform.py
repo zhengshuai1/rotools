@@ -1093,6 +1093,7 @@ def quaternion_matrix(quaternion):
 
 def quaternion_from_matrix(matrix):
     """Return quaternion from rotation matrix.
+
     >>> R = rotation_matrix(0.123, (1, 2, 3))
     >>> q = quaternion_from_matrix(R)
     >>> numpy.allclose(q, [0.0164262, 0.0328524, 0.0492786, 0.9981095])

@@ -148,9 +148,10 @@ def matrix_log3(R):
         return theta / 2.0 / np.sin(theta) * (R - np.array(R).T)
 
 
-def RpToTrans(R, p):
+def rp_to_homo_trans(R, p):
     """Converts a rotation matrix and a position vector into homogeneous
-    transformation matrix
+    transformation matrix.
+
     :param R: A 3x3 rotation matrix
     :param p: A 3-vector
     :return: A homogeneous transformation matrix corresponding to the inputs
@@ -168,9 +169,10 @@ def RpToTrans(R, p):
     return np.r_[np.c_[R, p], [[0, 0, 0, 1]]]
 
 
-def TransToRp(T):
+def homo_trans_to_rp(T):
     """Converts a homogeneous transformation matrix into a rotation matrix
-    and position vector
+    and position vector.
+
     :param T: A homogeneous transformation matrix
     :return R: The corresponding rotation matrix,
     :return p: The corresponding position vector.
@@ -189,8 +191,9 @@ def TransToRp(T):
     return T[0: 3, 0: 3], T[0: 3, 3]
 
 
-def TransInv(T):
+def homo_trans_inv(T):
     """Inverts a homogeneous transformation matrix
+
     :param T: A homogeneous transformation matrix
     :return: The inverse of T
     Uses the structure of transformation matrices to avoid taking a matrix
@@ -206,13 +209,14 @@ def TransInv(T):
                   [0, -1, 0,  0],
                   [0,  0, 0,  1]])
     """
-    R, p = TransToRp(T)
+    R, p = homo_trans_to_rp(T)
     Rt = np.array(R).T
     return np.r_[np.c_[Rt, -np.dot(Rt, p)], [[0, 0, 0, 1]]]
 
 
 def vector_to_se3(V):
-    """Converts a spatial velocity vector into a 4x4 matrix in se3
+    """Converts a spatial velocity vector into a 4x4 matrix in se3.
+
     :param V: A 6-vector representing a spatial velocity
     :return: The 4x4 se3 representation of V
     Example Input:
@@ -227,8 +231,9 @@ def vector_to_se3(V):
                  np.zeros((1, 4))]
 
 
-def se3ToVec(se3mat):
-    """ Converts an se3 matrix into a spatial velocity vector
+def se3_to_vec(se3mat):
+    """Converts an se3 matrix into a spatial velocity vector (twist).
+
     :param se3mat: A 4x4 matrix in se3
     :return: The spatial velocity 6-vector corresponding to se3mat
     Example Input:
@@ -261,14 +266,15 @@ def Adjoint(T):
                   [3, 0,  0, 0, 0, -1],
                   [0, 0,  0, 0, 1,  0]])
     """
-    R, p = TransToRp(T)
+    R, p = homo_trans_to_rp(T)
     return np.r_[np.c_[R, np.zeros((3, 3))],
                  np.c_[np.dot(vector_to_so3(p), R), R]]
 
 
 def ScrewToAxis(q, s, h):
     """Takes a parametric description of a screw axis and converts it to a
-    normalized screw axis
+    normalized screw axis.
+
     :param q: A point lying on the screw axis
     :param s: A unit vector in the direction of the screw axis
     :param h: The pitch of the screw axis
@@ -348,7 +354,7 @@ def MatrixLog6(T):
                   [0, 1.57079633,           0,  2.35619449]
                   [0,          0,           0,           0]])
     """
-    R, p = TransToRp(T)
+    R, p = homo_trans_to_rp(T)
     omgmat = matrix_log3(R)
     if np.array_equal(omgmat, np.zeros((3, 3))):
         return np.r_[np.c_[np.zeros((3, 3)),
@@ -410,7 +416,7 @@ def ProjectToSE3(mat):
                   [ 0.        ,  0.        ,  0.        ,  1.  ]])
     """
     mat = np.array(mat)
-    return RpToTrans(ProjectToSO3(mat[:3, :3]), mat[:3, 3])
+    return rp_to_homo_trans(ProjectToSO3(mat[:3, :3]), mat[:3, 3])
 
 
 def DistanceToSO3(mat):
@@ -486,7 +492,8 @@ def TestIfSO3(mat):
 
 
 def TestIfSE3(mat):
-    """Returns true if mat is close to or on the manifold SE(3)
+    """Returns true if mat is close to or on the manifold SE(3).
+
     :param mat: A 4x4 matrix
     :return: True if mat is very close to or in SE(3), false otherwise
     Computes the distance d from mat to the SE(3) manifold using the
@@ -691,8 +698,8 @@ def IKinBody(Blist, M, T, thetalist0, eomg, ev):
     thetalist = np.array(thetalist0).copy()
     i = 0
     maxiterations = 20
-    Vb = se3ToVec(MatrixLog6(np.dot(TransInv(FKinBody(M, Blist, \
-                                                      thetalist)), T)))
+    Vb = se3_to_vec(MatrixLog6(np.dot(homo_trans_inv(FKinBody(M, Blist, \
+                                                              thetalist)), T)))
     err = np.linalg.norm([Vb[0], Vb[1], Vb[2]]) > eomg \
           or np.linalg.norm([Vb[3], Vb[4], Vb[5]]) > ev
     while err and i < maxiterations:
@@ -701,8 +708,8 @@ def IKinBody(Blist, M, T, thetalist0, eomg, ev):
                                                          thetalist)), Vb)
         i = i + 1
         Vb \
-            = se3ToVec(MatrixLog6(np.dot(TransInv(FKinBody(M, Blist, \
-                                                           thetalist)), T)))
+            = se3_to_vec(MatrixLog6(np.dot(homo_trans_inv(FKinBody(M, Blist, \
+                                                                   thetalist)), T)))
         err = np.linalg.norm([Vb[0], Vb[1], Vb[2]]) > eomg \
               or np.linalg.norm([Vb[3], Vb[4], Vb[5]]) > ev
     return (thetalist, not err)
@@ -756,7 +763,7 @@ def IKinSpace(Slist, M, T, thetalist0, eomg, ev):
     maxiterations = 20
     Tsb = fk_in_space(M, Slist, thetalist)
     Vs = np.dot(Adjoint(Tsb), \
-                se3ToVec(MatrixLog6(np.dot(TransInv(Tsb), T))))
+                se3_to_vec(MatrixLog6(np.dot(homo_trans_inv(Tsb), T))))
     err = np.linalg.norm([Vs[0], Vs[1], Vs[2]]) > eomg \
           or np.linalg.norm([Vs[3], Vs[4], Vs[5]]) > ev
     while err and i < maxiterations:
@@ -766,7 +773,7 @@ def IKinSpace(Slist, M, T, thetalist0, eomg, ev):
         i = i + 1
         Tsb = fk_in_space(M, Slist, thetalist)
         Vs = np.dot(Adjoint(Tsb), \
-                    se3ToVec(MatrixLog6(np.dot(TransInv(Tsb), T))))
+                    se3_to_vec(MatrixLog6(np.dot(homo_trans_inv(Tsb), T))))
         err = np.linalg.norm([Vs[0], Vs[1], Vs[2]]) > eomg \
               or np.linalg.norm([Vs[3], Vs[4], Vs[5]]) > ev
     return (thetalist, not err)
@@ -856,15 +863,15 @@ def InverseDynamics(thetalist, dthetalist, ddthetalist, g, Ftip, Mlist, \
     Vi = np.zeros((6, n + 1))
     Vdi = np.zeros((6, n + 1))
     Vdi[:, 0] = np.r_[[0, 0, 0], -np.array(g)]
-    AdTi[n] = Adjoint(TransInv(Mlist[n]))
+    AdTi[n] = Adjoint(homo_trans_inv(Mlist[n]))
     Fi = np.array(Ftip).copy()
     taulist = np.zeros(n)
     for i in range(n):
         Mi = np.dot(Mi, Mlist[i])
-        Ai[:, i] = np.dot(Adjoint(TransInv(Mi)), np.array(Slist)[:, i])
+        Ai[:, i] = np.dot(Adjoint(homo_trans_inv(Mi)), np.array(Slist)[:, i])
         AdTi[i] = Adjoint(np.dot(MatrixExp6(vector_to_se3(Ai[:, i] * \
                                                           -thetalist[i])), \
-                                 TransInv(Mlist[i])))
+                                 homo_trans_inv(Mlist[i])))
         Vi[:, i + 1] = np.dot(AdTi[i], Vi[:, i]) + Ai[:, i] * dthetalist[i]
         Vdi[:, i + 1] = np.dot(AdTi[i], Vdi[:, i]) \
                         + Ai[:, i] * ddthetalist[i] \
@@ -1267,10 +1274,11 @@ def InverseDynamicsTrajectory(thetamat, dthetamat, ddthetamat, g, \
     return taumat
 
 
-def ForwardDynamicsTrajectory(thetalist, dthetalist, taumat, g, Ftipmat, \
+def ForwardDynamicsTrajectory(thetalist, dthetalist, taumat, g, Ftipmat,
                               Mlist, Glist, Slist, dt, intRes):
     """Simulates the motion of a serial chain given an open-loop history of
-    joint forces/torques
+    joint forces/torques.
+
     :param thetalist: n-vector of initial joint variables
     :param dthetalist: n-vector of initial joint rates
     :param taumat: An N x n matrix of joint forces/torques, where each row is
@@ -1418,8 +1426,7 @@ def QuinticTimeScaling(Tf, t):
     Output:
         0.16308
     """
-    return 10 * (1.0 * t / Tf) ** 3 - 15 * (1.0 * t / Tf) ** 4 \
-           + 6 * (1.0 * t / Tf) ** 5
+    return 10 * (1.0 * t / Tf) ** 3 - 15 * (1.0 * t / Tf) ** 4 + 6 * (1.0 * t / Tf) ** 5
 
 
 def JointTrajectory(thetastart, thetaend, Tf, N, method):
@@ -1515,9 +1522,7 @@ def ScrewTrajectory(Xstart, Xend, Tf, N, method):
             s = CubicTimeScaling(Tf, timegap * i)
         else:
             s = QuinticTimeScaling(Tf, timegap * i)
-        traj[i] \
-            = np.dot(Xstart, MatrixExp6(MatrixLog6(np.dot(TransInv(Xstart), \
-                                                          Xend)) * s))
+        traj[i] = np.dot(Xstart, MatrixExp6(MatrixLog6(np.dot(homo_trans_inv(Xstart), Xend)) * s))
     return traj
 
 
@@ -1571,8 +1576,8 @@ def CartesianTrajectory(Xstart, Xend, Tf, N, method):
     N = int(N)
     timegap = Tf / (N - 1.0)
     traj = [[None]] * N
-    Rstart, pstart = TransToRp(Xstart)
-    Rend, pend = TransToRp(Xend)
+    Rstart, pstart = homo_trans_to_rp(Xstart)
+    Rend, pend = homo_trans_to_rp(Xend)
     for i in range(N):
         if method == 3:
             s = CubicTimeScaling(Tf, timegap * i)
@@ -1591,7 +1596,7 @@ def CartesianTrajectory(Xstart, Xend, Tf, N, method):
 '''
 
 
-def ComputedTorque(thetalist, dthetalist, eint, g, Mlist, Glist, Slist, \
+def ComputedTorque(thetalist, dthetalist, eint, g, Mlist, Glist, Slist,
                    thetalistd, dthetalistd, ddthetalistd, Kp, Ki, Kd):
     """Computes the joint control torques at a particular time instant
     :param thetalist: n-vector of joint variables
@@ -1650,18 +1655,18 @@ def ComputedTorque(thetalist, dthetalist, eint, g, Mlist, Glist, Slist, \
         np.array([133.00525246, -29.94223324, -3.03276856])
     """
     e = np.subtract(thetalistd, thetalist)
-    return np.dot(MassMatrix(thetalist, Mlist, Glist, Slist), \
-                  Kp * e + Ki * (np.array(eint) + e) \
-                  + Kd * np.subtract(dthetalistd, dthetalist)) \
-           + InverseDynamics(thetalist, dthetalist, ddthetalistd, g, \
-                             [0, 0, 0, 0, 0, 0], Mlist, Glist, Slist)
+    return np.dot(MassMatrix(thetalist, Mlist, Glist, Slist),
+                  Kp * e + Ki * (np.array(eint) + e)
+                  + Kd * np.subtract(dthetalistd, dthetalist)) + InverseDynamics(thetalist, dthetalist, ddthetalistd, g,
+                  [0, 0, 0, 0, 0, 0], Mlist, Glist, Slist)
 
 
-def SimulateControl(thetalist, dthetalist, g, Ftipmat, Mlist, Glist, \
-                    Slist, thetamatd, dthetamatd, ddthetamatd, gtilde, \
+def SimulateControl(thetalist, dthetalist, g, Ftipmat, Mlist, Glist,
+                    Slist, thetamatd, dthetamatd, ddthetamatd, gtilde,
                     Mtildelist, Gtildelist, Kp, Ki, Kd, dt, intRes):
     """Simulates the computed torque controller over a given desired
-    trajectory
+    trajectory.
+
     :param thetalist: n-vector of initial joint variables
     :param dthetalist: n-vector of initial joint velocities
     :param g: Actual gravity vector g
