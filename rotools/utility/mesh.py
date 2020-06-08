@@ -2,7 +2,12 @@ from __future__ import print_function
 
 
 class WebotsConverter(object):
-    """"""
+    """This tool converts solid mesh in Webots proto file to stl format in
+    a semi-automatic way. First, you need copy the vertexes and coordinate index
+    of a mesh to x.vertex and x.index manually, and then using this tool to
+    generate stl in ASCII format. You may need to further convert the stl file
+    to binary using Blender to save space.
+    """
 
     def __init__(self):
         super(WebotsConverter, self).__init__()
@@ -29,11 +34,8 @@ class WebotsConverter(object):
             indexes = i_file.readline()
             index_list = indexes.split(', -1, ')
 
-            assert len(index_list) == 2 * len(self.vertexes_list)
-
             for i in index_list:
                 # index of the vertexes belonging to the same face
-                print(i)
                 i1, i2, i3 = i.split(', ')
                 v1 = self.vertexes_list[int(i1)]
                 v2 = self.vertexes_list[int(i2)]
