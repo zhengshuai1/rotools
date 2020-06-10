@@ -10,7 +10,9 @@ try:
 
     import geometry_msgs.msg as GeometryMsg
     import moveit_msgs.msg as MoveItMsg
-except ModuleNotFoundError:
+    import std_msgs.msg as StdMsg
+    import sensor_msgs.msg as SensorMsg
+except ImportError:
     pass
 
 from rotools.utility import common
@@ -272,3 +274,138 @@ class MoveGroupInterface(object):
     def remove_obj(self, timeout=4):
         self.scene.remove_world_object(self.attached_object_name)
         return self.wait_for_state_update(obj_is_attached=False, name_is_known=False, timeout=timeout)
+
+
+class WalkerMoveGroupInterface(object):
+
+    def __init__(self, group_name, home_pose_name):
+        super(WalkerMoveGroupInterface, self).__init__()
+
+        moveit_commander.roscpp_initialize(sys.argv)
+
+        # Instantiate a `RobotCommander`_ object. Provides information such as the robot's
+        # kinematic model and the robot's current joint states
+        self.commander = moveit_commander.RobotCommander()
+
+        # Instantiate a `PlanningSceneInterface`_ object.  This provides a remote interface
+        # for getting, setting, and updating the robot's internal understanding of the
+        # surrounding world:
+        self.scene = moveit_commander.PlanningSceneInterface()
+
+        self.group_name = group_name
+        self.home_pose_name = home_pose_name
+        self.move_group = moveit_commander.MoveGroupCommander(self.group_name)
+
+        # We can get the name of the reference frame for this robot:
+        self.planning_frame = self.move_group.get_planning_frame()
+        print('planning frame:', self.planning_frame)
+
+        # We can also print the name of the end-effector link for this group:
+        self.eef_link = self.move_group.get_end_effector_link()
+
+        # We can get a list of all the groups in the robot:
+        group_names = self.commander.get_group_names()
+
+        # Sometimes for debugging it is useful to print the entire state of the robot:
+        print(self.commander.get_current_state())
+
+    def get_active_joint_names(self):
+        return self.move_group.get_active_joints()
+
+    def get_joint_state(self):
+        """Get joint states of the robot
+
+        :return: List[float]
+        """
+        return self.move_group.get_current_joint_values()
+
+    def get_current_pose(self):
+        """Get the eef pose in ROS format.
+
+        :return: pose_stamped
+        """
+        return self.move_group.get_current_pose()
+
+    def set_start_state(self, joint_state):
+        """Specifically set the start state
+
+        :param joint_state: sensor_msgs JointState, the header, name, and
+        position must be given.
+        """
+
+        moveit_robot_state = MoveItMsg.RobotState()
+        moveit_robot_state.joint_state = joint_state
+        return self.move_group.set_start_state(moveit_robot_state)
+
+    def go_to_joint_state(self, joint_goal):
+        """Set the joint states as desired.
+
+        :param joint_goal: joint state list
+        :return:
+        """
+        self.move_group.go(joint_goal, wait=True)
+
+        # Calling ``stop()`` ensures that there is no residual movement
+        self.move_group.stop()
+
+        # For testing:
+        current_joints = self.move_group.get_current_joint_values()
+        return common.all_close(joint_goal, current_joints, 0.01)
+
+    def go_home(self):
+        """Reset to home pose."""
+        self.move_group.set_named_target(self.home_pose_name)
+        self.move_group.go()
+
+    def go_to_pose_goal(self, pose_goal):
+        """Set the eef pose as desired.
+
+        :param pose_goal: geometry_msgs.msg.Pose()
+        :return: if in goal pose
+        """
+        self.move_group.set_pose_target(pose_goal)
+
+        plan = self.move_group.go(wait=True)
+        # Calling `stop()` ensures that there is no residual movement
+        self.move_group.stop()
+        # It is always good to clear your targets after planning with poses.
+        # Note: there is no equivalent function for clear_joint_value_targets()
+        self.move_group.clear_pose_targets()
+
+        current_pose = self.move_group.get_current_pose().pose
+        return common.all_close(pose_goal, current_pose, 0.01)
+
+    def plan_cartesian_path(self, waypoints):
+        """Given way points in a list of geometry msg pose, plan a path
+        go through all way points.
+
+        :param waypoints: List[Pose]
+        :param
+
+        example
+        # wpose = self.move_group.get_current_pose().pose
+        # wpose.position.z -= 0.1  # First move up (z)
+        # wpose.position.y += 0.2  # and sideways (y)
+        # waypoints.append(copy.deepcopy(wpose))
+        #
+        # wpose.position.x += 0.1  # Second move forward/backwards in (x)
+        # waypoints.append(copy.deepcopy(wpose))
+        #
+        # wpose.position.y -= 0.1  # Third move sideways (y)
+        # waypoints.append(copy.deepcopy(wpose))
+        """
+
+        (plan, fraction) = self.move_group.compute_cartesian_path(
+            waypoints,  # waypoints to follow
+            0.01,  # eef_step
+            0.0)  # jump_threshold
+
+        # Note: We are just planning, not asking move_group to actually move the robot yet:
+        return plan, fraction
+
+    def execute_plan(self, plan):
+        self.move_group.execute(plan, wait=True)
+
+    def go_though_joint_state(self, joint_state):
+        """Go through a series of joint states."""
+        self.move_group.set_pose_targets()

@@ -880,7 +880,7 @@ def superimposition_matrix(v0, v1, scaling=False, usesvd=True):
 
 
 def euler_matrix(ai, aj, ak, axes='sxyz'):
-    """Return homogeneous rotation matrix from Euler angles and axis sequence.
+    """Return homogeneous rotation matrix (4x4) from Euler angles and axis sequence.
     ai, aj, ak : Euler's roll, pitch and yaw angles
     axes : One of 24 axis sequences as string or encoded tuple
     >>> R = euler_matrix(1, 2, 3, 'syxz')

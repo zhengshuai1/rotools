@@ -148,6 +148,30 @@ def ur5e_poe_model():
     return M, screw_axes
 
 
+def walker_left_arm_poe_model():
+    """Get poe model of the UBTech Walker's left arm
+    joint1 to joint7.
+    """
+
+    # This matrix is calculated by test/test_create_model
+    M = np.array([
+        [9.98925860e-01, 4.63370949e-02, -1.70247991e-07, 4.51820844e-01],
+        [3.40368002e-07, -1.10117044e-05, -1.00000000e+00, -8.40714493e-08],
+        [-4.63370949e-02, 9.98925860e-01, -1.10156479e-05, -1.02911897e-02],
+        [0,  0,  0,  1]
+    ])
+    # screw axes all relative to joint 1
+    screw_axes = np.array([
+        [0, 0, -1, 0, 0, 0],
+        [0, -1, 0, 0, 0, 0],
+        [1, 0, 0, 0, 0, 0],
+        [0, -1, 0, -2.47791593e-02, 0, -2.28499909e-01],
+        [1, 0, 0, 0, 0, 0],
+        [0, 0, -1, 0, 4.51820844e-01, 0],  # +y
+        [0, 1, 0, 0, 0, 4.51820844e-01]  # +z
+    ])
+
+
 def franka_panda():
     """MDH parameters in alpha, a, theta, d order, with units be meter or radius
 
