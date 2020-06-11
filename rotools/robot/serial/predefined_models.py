@@ -148,28 +148,39 @@ def ur5e_poe_model():
     return M, screw_axes
 
 
-def walker_left_arm_poe_model():
-    """Get poe model of the UBTech Walker's left arm
-    joint1 to joint7.
-    """
+def walker_left_arm_poe():
+    """Get poe model of the UBTech Walker's left arm.
+    See test/test_create_model for details.
 
-    # This matrix is calculated by test/test_create_model
+    verified date: 2020/6/11
+    """
+    # home matrix (homogeneous matrix transform base frame to eef frame)
     M = np.array([
         [9.98925860e-01, 4.63370949e-02, -1.70247991e-07, 4.51820844e-01],
         [3.40368002e-07, -1.10117044e-05, -1.00000000e+00, -8.40714493e-08],
         [-4.63370949e-02, 9.98925860e-01, -1.10156479e-05, -1.02911897e-02],
-        [0,  0,  0,  1]
+        [0.00000000e+00, 0.00000000e+00, 0.00000000e+00, 1.00000000e+00]
     ])
-    # screw axes all relative to joint 1
+    # screw axes all relative to the base_frame (fixed relative to the robot base)
+    # to calculate rotation axis, we first align the origin of the frame in query
+    # to that of the base frame
     screw_axes = np.array([
         [0, 0, -1, 0, 0, 0],
-        [0, -1, 0, 0, 0, 0],
+        [0, 1, 0, 0, 0, 0],
         [1, 0, 0, 0, 0, 0],
         [0, -1, 0, -2.47791593e-02, 0, -2.28499909e-01],
         [1, 0, 0, 0, 0, 0],
-        [0, 0, -1, 0, 4.51820844e-01, 0],  # +y
-        [0, 1, 0, 0, 0, 4.51820844e-01]  # +z
+        [0, 0, -1, 0, 4.51820844e-01, 0],
+        [0, 1, 0, 0, 0, 4.51820844e-01]
+    ]).T
+    # transform from robot base link to arm base link (i.e., base_to_s)
+    base_to_static = np.array([
+        [-9.56714879e-07, -1., -3.73952529e-06, 0],
+        [2.60457789e-01, -3.85964030e-06, 9.65485236e-01, 2.41420000e-01],
+        [-9.65485236e-01, -5.02943990e-08, 2.60457789e-01, 1.83860000e-02],
+        [0., 0., 0.,  1.]
     ])
+    return M, screw_axes, base_to_static
 
 
 def franka_panda():

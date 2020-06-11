@@ -10,6 +10,7 @@ from _kinematic_chain import MDHKinematicChain
 from _tool import Tool
 
 from rotools.utility import common
+from rotools.utility import transform
 from rotools.utility import kinematics
 
 
@@ -58,6 +59,9 @@ class RobotModel(Sized):
 
     # Used in MDH calculation
     kinematic_chain = attrib(default=None, type=MDHKinematicChain)
+
+    # For transform eef pose in arm base link to robot base link or inverse
+    base_to_static_trans = attrib(factory=lambda: transform.identity_matrix(), type=np.ndarray)
 
     random_state = attrib(
         factory=lambda: np.random.RandomState(),
@@ -117,13 +121,22 @@ class RobotModel(Sized):
             pose = np.eye(4, dtype=float)
             for t in transforms:
                 pose = np.dot(pose, t)
-
         return pose
+
+    def fk_to_base(self, q):
+        """Given joint states, compute the fk relative to manually set base frame
+        with base_to_static_trans. This function is useful when the robot arm's static frame is
+        not the reference frame of the robot (like the scenario for humanoids)
+
+        :param q: ndarray, the joint states of serial robots
+        """
+        pose_eef_in_arm_base = self.fk(q)
+        return np.dot(self.base_to_static_trans, pose_eef_in_arm_base)
 
     def ik(self, pose, q):
         """Solve the inverse kinematics.
 
-        :param pose: 4x4 transformation matrix
+        :param pose: 4x4 transformation matrix of the eef in the arm base frame
         :param q: Sequence[float] the current joint state
         :return ndarray or None
         """
@@ -140,10 +153,9 @@ class RobotModel(Sized):
 
     @property
     def dof(self):
-        """
-        Get the number of degrees of freedom.
+        """Get the number of degrees of freedom.
 
-        :return: number of degrees of freedom
+        :return: DoF
         """
         return len(self)
 
@@ -165,7 +177,6 @@ class RobotModel(Sized):
     @property
     def joint_velocities(self):
         """Get the joint velocities in rad/s."""
-
         return self._joint_velocities
 
     @joint_velocities.setter
@@ -181,7 +192,6 @@ class RobotModel(Sized):
 
     @property
     def velocity_limits(self):
-
         return self._vel_limits
 
     @velocity_limits.setter
@@ -216,7 +226,6 @@ class RobotModel(Sized):
         j_tr[:3, :3] = rotation
         j_tr[3:, 3:] = rotation
         j_w = np.dot(j_tr, j_fl)
-
         return j_w
 
     def jacobian_flange(self, q=None):
@@ -239,9 +248,7 @@ class RobotModel(Sized):
                 ]
             )
             delta = current_transform[2, 0:3]
-
             jacobian_flange[:, i] = np.hstack((d, delta))
-
             current_link = self.kinematic_chain.links[i]
             p = q[i]
             current_link_transform = current_link.transform(p)
@@ -278,14 +285,14 @@ class RobotModel(Sized):
                 break
 
             # get current link transform
-            transform = self.kinematic_chain.links[i].transform(p)
+            t = self.kinematic_chain.links[i].transform(p)
 
             # calculate force applied to current link
-            rotation = transform[:3, :3]
+            rotation = t[:3, :3]
             force = np.dot(rotation, force)
 
             # calculate moment applied to current link
-            q = transform[:3, -1]
+            q = t[:3, -1]
             moment = np.dot(rotation, moment) + np.cross(q, force)
 
             # append z-component as joint torque
@@ -303,7 +310,6 @@ class RobotModel(Sized):
         q = self.random_state.uniform(
             low=self.joint_limits[0], high=self.joint_limits[1]
         )
-
         if in_place:
             self.joints = q
             return None
@@ -320,7 +326,11 @@ class RobotModel(Sized):
     @classmethod
     def from_poe_parameters(cls, parameters):
         """Construct robot model from product of exponentials parameters."""
-        return cls(home_matrix=parameters[0], screw_axes=parameters[1])
+        if len(parameters) == 3:
+            base_trans = parameters[2]
+        else:
+            base_trans = transform.identity_matrix()
+        return cls(home_matrix=parameters[0], screw_axes=parameters[1], base_to_static_trans=base_trans)
 
 
 def _ik_cost_function(q, pose, robot):
