@@ -7,7 +7,7 @@ try:
     import trajectory_msgs.msg as TrajectoryMsg
 
     from moveit_commander.conversions import pose_to_list
-except ModuleNotFoundError:
+except ImportError:
     pass
 
 from rotools.utility import transform
@@ -77,11 +77,11 @@ def sd_pose(pose):
         raise NotImplementedError
 
 
-def ros_pose(pose):
+def to_ros_pose(pose):
     """Convert standard pose in 4x4 matrix to ROS geometry msg pose
 
-    :param pose:
-    :return: geometry msg pose
+    :param pose: ndarray, standard pose matrix representing a single pose
+    :return: geometry_msgs.Pose
     """
     if isinstance(pose, np.ndarray):
         if pose.shape == (4, 4):
@@ -112,10 +112,9 @@ def ros_pose(pose):
         raise NotImplementedError
 
 
-def ros_plan(t, p, v=None, a=None):
-    """Convert a plan to ros MoveItMsg.RobotTrajectory msg.
-    Note that the msg contains no joint name, which need
-    to be added explicitly.
+def to_ros_plan(t, p, v=None, a=None):
+    """Convert a series of time stamps and positions to ros MoveItMsg.RobotTrajectory msg.
+    Note that the msg contains no joint name, which need to be added explicitly.
 
     :param t: timestamp of shape N
     :param p: way point positions of shape [dim, N]
@@ -138,4 +137,5 @@ def ros_plan(t, p, v=None, a=None):
         wpt.accelerations = zero_list if a is None else list(a[:, w])
         wpt.time_from_start = rospy.Duration.from_sec(t[w])
         msg.joint_trajectory.points.append(wpt)
+
     return msg

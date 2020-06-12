@@ -406,6 +406,11 @@ class WalkerMoveGroupInterface(object):
     def execute_plan(self, plan):
         self.move_group.execute(plan, wait=True)
 
-    def go_though_joint_state(self, joint_state):
-        """Go through a series of joint states."""
-        self.move_group.set_pose_targets()
+    def go_through_poses(self, poses):
+        """Go through a series of poses.
+
+        :param poses: List[geometry_msgs.Pose]
+        """
+        for pose in poses:
+            self.move_group.set_pose_target(pose)
+            self.move_group.go()
