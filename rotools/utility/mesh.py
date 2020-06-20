@@ -11,7 +11,6 @@ class WebotsConverter(object):
 
     def __init__(self):
         super(WebotsConverter, self).__init__()
-        self.vertexes_list = None
         self.face_list = []
 
     def read_proto(self, vertex_file, index_file):
@@ -23,24 +22,54 @@ class WebotsConverter(object):
         :param index_file: string file records vertex index of each face
         :return:
         """
-        self.face_list = []
+        point_list = self.read_coordinate_file(vertex_file)
+        index_list = self.read_index_file(index_file)
 
-        with open(vertex_file, 'r') as v_file:
-            vertexes = v_file.readline()
-            self.vertexes_list = vertexes.split(', ')
-            print('Total vertexes #', len(self.vertexes_list))
-
-        with open(index_file, 'r') as i_file:
-            indexes = i_file.readline()
-            index_list = indexes.split(', -1, ')
-
-            for i in index_list:
-                # index of the vertexes belonging to the same face
-                i1, i2, i3 = i.split(', ')
-                v1 = self.vertexes_list[int(i1)]
-                v2 = self.vertexes_list[int(i2)]
-                v3 = self.vertexes_list[int(i3)]
+        for i in index_list:
+            # index of the vertexes belonging to the same face
+            try:
+                i1, i2, i3 = i.split(' ')
+                v1 = point_list[int(i1)]
+                v2 = point_list[int(i2)]
+                v3 = point_list[int(i3)]
                 self.face_list.append([v1, v2, v3])
+            except ValueError:
+                print(i)
+
+    @staticmethod
+    def read_coordinate_file(coordinate_file):
+        """The coordinates of vertexes are arranged in x y z order.
+        Note that ',' may be present after z.
+        
+        :param coordinate_file: text file containing the coordinate values
+        :return: 
+        """
+        with open(coordinate_file, 'r') as v_file:
+            coord_raw = v_file.readline()
+            coordinates = coord_raw.replace(",", "")
+            c_list = coordinates.split(' ')
+            # 3 coordinates form a point
+            assert len(c_list) % 3 == 0
+            sz = len(c_list)
+            point_list = []
+            for i in range(0, sz, 3):
+                point_list.append("{} {} {}".format(c_list[i], c_list[i+1], c_list[i+2]))
+            print('Total vertexes #', len(point_list))
+            return point_list
+
+    @staticmethod
+    def read_index_file(index_file):
+        """The usable values in the index_file are arranged in the order
+        v1, v2, v3, -1, note that any of these 4 ',' could be missing.
+
+        :param index_file: text file containing the coordIndex
+        :return: index_list
+        """
+        with open(index_file, 'r') as i_file:
+            indexes_raw = i_file.readline()
+            indexes = indexes_raw.replace(",", "")
+            index_list = indexes.split(' -1 ')
+            return index_list
 
     def write_to_stl(self, stl_file):
         """
