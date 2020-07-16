@@ -1,12 +1,25 @@
 # RoTools
 
-A robot toolbox belongs to the **Ro** series
+A robot toolbox belonging to the **RoUniverse**, which is a personal project aiming
+at developing handy robotic related tools during learning and implementing.
 
-## File structure
+RoTools is compatible with both Python 2.7 and 3.7+
 
-#### policy
+Author: Zhipeng Dong
 
-Policies for path motion planning
+## Submodules
+
+The submodules of RoTools are designed to running individually or jointly.
+Refer README in each submodule for a detailed guide.
+
+### interface
+
+Interfaces for RoTools to interact with 3rd-party software like the MoveIt! 
+motion planing package and simulators such as Webots.
+
+### policy
+
+Policies for motion planning and trajectory generation.
 
 #### robot
 

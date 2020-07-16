@@ -1,5 +1,3 @@
-# Note that this is just a example for interacting with MoveIt in ROS
-
 from __future__ import print_function
 
 import sys
@@ -414,3 +412,13 @@ class WalkerMoveGroupInterface(object):
         for pose in poses:
             self.move_group.set_pose_target(pose)
             self.move_group.go()
+
+    def go_through_joint_states(self, js_list):
+        """Go through a series of joint states
+
+        :param poses: List[array]
+        """
+        for js in js_list:
+            self.go_to_joint_state(js)
+
+

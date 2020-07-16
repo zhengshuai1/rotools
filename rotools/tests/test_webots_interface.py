@@ -6,7 +6,7 @@ from __future__ import print_function
 import unittest
 import numpy as np
 
-import rotools.interface.webots as webots_interface
+import rotools.simulation.webots as webots_interface
 import rotools.utility.transform as transform
 
 
