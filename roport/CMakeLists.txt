@@ -63,6 +63,7 @@ add_service_files(
   GetGroupPose.srv
   GetGroupJointStates.srv
   ExecuteGroupPlan.srv
+  ExecuteAllPlans.srv
 )
 
 ## Generate actions in the 'action' folder

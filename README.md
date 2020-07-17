@@ -47,7 +47,10 @@ Utilities for general function
 ## RoPort
 
 RoPort is a ROS package that bridge the RoTools interface with ROS. This package should
-be placed in the catkin_ws/src during usage.
+be placed in the catkin_ws/src during usage, or better, you could create a symlink
+to it like this:
+
+`ln -s /home/dzp/rotools/roport/ /home/dzp/catkin_ws/src/`
 
 ## Coding Guide
 

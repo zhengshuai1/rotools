@@ -1,0 +1,9 @@
+std_msgs/Header header
+bool is_relative
+float32 stamp
+float32 eef_step
+bool avoid_collisions
+---
+uint8 SUCCEEDED=0
+uint8 FAILED=1
+uint8 result_status
