@@ -1,0 +1,11 @@
+<launch>
+    <param name="/use_sim_time" value="true" />
+
+    <include file="$(find walker_webots_hardware_interface)/launch/moveit.launch">
+        <arg name="show_rviz" value="false" />
+    </include>
+
+<!--    <node pkg="roport" type="walker_moveit_server.py" name="walker_moveit_server" output="screen">-->
+<!--    </node>-->
+
+</launch>

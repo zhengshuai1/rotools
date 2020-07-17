@@ -16,26 +16,38 @@ from rotools.utility import transform
 def all_close(goal, actual, tolerance):
     """Test if a list of values are within a tolerance of their counterparts in another list.
 
-    :param: goal A list of floats, a Pose or a PoseStamped
-    :param: actual     A list of floats, a Pose or a PoseStamped
-    :param: tolerance  A float
+    :param goal: A list of floats, a Pose or a PoseStamped
+    :param actual: A list of floats, a Pose or a PoseStamped
+    :param tolerance: A float
     :returns: bool
     """
     if type(goal) is list:
         if not np.allclose(goal, actual, atol=tolerance):
+            print('Goal not reached!')
             return False
-
     elif type(goal) is GeometryMsg.PoseStamped:
         return all_close(goal.pose, actual.pose, tolerance)
-
     elif type(goal) is GeometryMsg.Pose:
         return all_close(pose_to_list(goal), pose_to_list(actual), tolerance)
+    else:
+        raise NotImplementedError
 
+    print('Goal reached')
     return True
 
 
 def sd_joint_state():
     pass
+
+
+def regularize_pose(pose):
+    """It is odd if we do not regularize the pose
+
+    :param pose: geometry_msgs/Pose
+    :return:
+    """
+    pose_mat = sd_pose(pose)
+    return to_ros_pose(pose_mat)
 
 
 def sd_pose(pose):

@@ -23,6 +23,8 @@ class MoveGroupInterface(object):
 
     def __init__(
             self,
+            robot_description,
+            ns,
             group_names,
             ref_frames=None,
             ee_links=None,
@@ -31,28 +33,24 @@ class MoveGroupInterface(object):
         super(MoveGroupInterface, self).__init__()
 
         moveit_commander.roscpp_initialize(sys.argv)
+        print(robot_description, ns, group_names)
 
-        self.commander = moveit_commander.RobotCommander()
-        self.scene = moveit_commander.PlanningSceneInterface()
+        self.commander = moveit_commander.RobotCommander(robot_description, ns)
+        # self.scene = moveit_commander.PlanningSceneInterface(ns=ns)
 
-        assert isinstance(self.group_names, list) and len(self.group_names) >= 1
+        assert isinstance(group_names, list)
+        self.group_names = group_names
+        self.group_num = len(self.group_names)
+        assert self.group_num >= 1
+
         # We can get a list of all the groups in the robot:
         all_group_names = self.commander.get_group_names()
         for name in self.group_names:
             assert name in all_group_names, 'Group name {} is not exist'.format(name)
 
-        self.group_names = group_names
-        self.group_num = len(self.group_names)
-
         self.move_groups = []
         for name in self.group_names:
             self.move_groups.append(moveit_commander.MoveGroupCommander(name))
-
-        # Create a `DisplayTrajectory`_ ROS publisher which is used to display
-        # trajectories in Rviz:
-        self.display_trajectory_publisher = rospy.Publisher('/move_group/display_planned_path',
-                                                            MoveItMsg.DisplayTrajectory,
-                                                            queue_size=20)
 
         if not ref_frames:
             self.ref_frames = []
@@ -114,10 +112,10 @@ class MoveGroupInterface(object):
             ret.append(group.get_current_pose())
         return ret
 
-    def get_current_poses_of_group(self, group_name):
+    def get_current_pose_of_group(self, group_name):
         group_id = self._get_group_id(group_name)
         assert group_id is not None
-        return self.move_groups[group_id].get_current_pose()
+        return self.move_groups[group_id].get_current_pose().pose
 
     def group_go_to_joint_states(self, group_name, goal, tolerance=0.01):
         """Set the joint states as desired.
@@ -165,14 +163,14 @@ class MoveGroupInterface(object):
         group.stop()
         group.clear_pose_targets()
 
-        current_pose = group.get_current_pose().pose
+        current_pose = common.regularize_pose(group.get_current_pose().pose)
         return common.all_close(goal, current_pose, tolerance)
 
     def _to_absolute_pose(self, group_name, relative_pose):
-        current_pose = self.get_current_poses_of_group(group_name).pose
+        current_pose = self.get_current_pose_of_group(group_name)
         current_pose_mat = common.sd_pose(current_pose)
         relative_pose_mat = common.sd_pose(relative_pose)
-        absolute_pose_mat = np.dot(relative_pose_mat, current_pose_mat)  # left product
+        absolute_pose_mat = np.dot(current_pose_mat, relative_pose_mat)  # T_b1 * T_12 = T_b2
         return common.to_ros_pose(absolute_pose_mat)
 
     def group_go_to_absolute_pose_goal(self, group_name, goal, tolerance=0.01):
@@ -228,43 +226,46 @@ class MoveGroupInterface(object):
         self._all_go_to_pose_goal(abs_goals)
 
     @staticmethod
-    def _build_plan(plan, stamps):
-        for i, point in enumerate(plan.joint_trajectory.points):
-            if i == 0:
-                assert point.time_from_start == 0
-                continue
-            point.time_from_start = stamps[i - 1]
+    def _update_plan_time_stamps(plan, stamp):
+        points_num = len(plan.joint_trajectory.points)
+        t = stamp / float(points_num)
+        for i in range(points_num):
+            plan.joint_trajectory.points[i].time_from_start = rospy.Duration.from_sec(t * (i + 1))
         return plan
 
-    def build_absolute_path_for_group(self, group_name, poses, stamps=None):
-        """Given way points in a list of geometry msg pose, plan a path
+    def build_absolute_path_for_group(self, group_name, poses, stamp=None, eef_step=0.01, avoid_collisions=True):
+        """Given way points in a list of geometry_msgs.Pose, plan a path
         go through all way points.
 
-        :param group_name
+        :param group_name: Group name for building plan
         :param poses: List[Pose]
-        :param stamps: time from start
+        :param stamp: Last time stamp from start
+        :param eef_step:
+        :param avoid_collisions:
         """
         group_id = self._get_group_id(group_name)
         assert group_id is not None
         group = self.move_groups[group_id]
-        plan, fraction = group.compute_cartesian_path(poses, 0.01, 0.0)
+        plan, fraction = group.compute_cartesian_path(poses, eef_step, jump_threshold=0.0,
+                                                      avoid_collisions=avoid_collisions)
 
-        if stamps:
-            assert len(poses) == len(stamps)
-            plan = self._build_plan(plan, stamps)
+        if stamp:
+            plan = self._update_plan_time_stamps(plan, stamp)
 
         # curr_state = self.commander.get_current_state()
         # group.retime_trajectory(curr_state, plan, )
         return plan
 
-    def build_relative_path_for_group(self, group_name, poses, stamps=None):
-        abs_poses = self._to_absolute_pose(group_name, poses)
-        return self.build_absolute_path_for_group(group_name, abs_poses, stamps)
+    def build_relative_path_for_group(self, group_name, poses, stamp=None, eef_step=0.01, avoid_collisions=True):
+        abs_poses = []
+        for pose in poses:
+            abs_poses.append(self._to_absolute_pose(group_name, pose))
+        return self.build_absolute_path_for_group(group_name, abs_poses, stamp, eef_step, avoid_collisions)
 
-    def group_execute_plan(self, group_name, plan):
+    def execute_plan_for_group(self, group_name, plan):
         group_id = self._get_group_id(group_name)
         assert group_id is not None
-        self.move_groups[group_id].execute(plan, wait=True)
+        return self.move_groups[group_id].execute(plan, wait=True)
 
     def build_absolute_paths_for_all(self, all_poses, all_stamps=None):
         all_plans = []
@@ -289,7 +290,7 @@ class MoveGroupInterface(object):
 
         return self.build_absolute_paths_for_all(all_abs_poses, all_stamps)
 
-    def all_execute_plan(self, plans):
+    def execute_plans_for_all(self, plans):
         assert len(plans) == self.group_num
         for i, plan in enumerate(plans):
             group = self.move_groups[i]
@@ -297,16 +298,3 @@ class MoveGroupInterface(object):
                 group.execute(plan, wait=True)
             else:
                 group.execute(plan, wait=False)
-
-    def display_trajectory(self, plan):
-        # You can ask RViz to visualize a plan (aka trajectory) for you. But the
-        # group.plan() method does this automatically so this is not that useful
-        # here (it just displays the same trajectory again):
-        # A `DisplayTrajectory`_ msg has two primary fields, trajectory_start and trajectory.
-        # We populate the trajectory_start with our current robot state to copy over
-        # any AttachedCollisionObjects and add our plan to the trajectory.
-        display_trajectory = MoveItMsg.DisplayTrajectory()
-        display_trajectory.trajectory_start = self.commander.get_current_state()
-        display_trajectory.trajectory.append(plan)
-        # Publish
-        self.display_trajectory_publisher.publish(display_trajectory)
