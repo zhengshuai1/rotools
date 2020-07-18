@@ -28,7 +28,6 @@ class MoveGroupInterface(object):
             group_names,
             ref_frames=None,
             ee_links=None,
-            verbose=False
     ):
         super(MoveGroupInterface, self).__init__()
 
@@ -67,8 +66,13 @@ class MoveGroupInterface(object):
             self.ee_links = ee_links
 
         # Sometimes for debugging it is useful to print the entire state of the robot:
-        if verbose:
-            print(self.commander.get_current_state())
+        print(self.commander.get_current_state())
+
+    def get_all_group_names(self):
+        return self.commander.get_group_names()
+
+    def get_active_group_names(self):
+        return self.group_names
 
     def _get_group_id(self, group_name):
         for i, name in enumerate(self.group_names):
@@ -166,8 +170,18 @@ class MoveGroupInterface(object):
         current_pose = common.regularize_pose(group.get_current_pose().pose)
         return common.all_close(goal, current_pose, tolerance)
 
-    def _to_absolute_pose(self, group_name, relative_pose):
-        current_pose = self.get_current_pose_of_group(group_name)
+    def _to_absolute_pose(self, group_name, relative_pose, init_pose=None):
+        """Convert a pose wrt eef to base_link.
+
+        :param group_name: String Planning group name
+        :param relative_pose: Pose or List[float]
+        :param init_pose:
+        :return: Pose
+        """
+        if not init_pose:
+            current_pose = self.get_current_pose_of_group(group_name)
+        else:
+            current_pose = init_pose
         current_pose_mat = common.sd_pose(current_pose)
         relative_pose_mat = common.sd_pose(relative_pose)
         absolute_pose_mat = np.dot(current_pose_mat, relative_pose_mat)  # T_b1 * T_12 = T_b2
@@ -225,20 +239,24 @@ class MoveGroupInterface(object):
 
         self._all_go_to_pose_goal(abs_goals)
 
-    @staticmethod
-    def _update_plan_time_stamps(plan, stamp):
-        points_num = len(plan.joint_trajectory.points)
-        t = stamp / float(points_num)
-        for i in range(points_num):
-            plan.joint_trajectory.points[i].time_from_start = rospy.Duration.from_sec(t * (i + 1))
-        return plan
+    def _update_plan_time_stamps(self, group, plan, stamp):
+        original_stamp = plan.joint_trajectory.points[-1].time_from_start.to_sec()
+        # points_num = len(plan.joint_trajectory.points)
+        velocity_scale = original_stamp / stamp
+        acceleration_scale = velocity_scale
+        print('velocity_scale ', velocity_scale)
+        curr_state = self.commander.get_current_state()
+        updated_plan = group.retime_trajectory(curr_state, plan, velocity_scale, acceleration_scale)
+        # for i in range(points_num):
+        #     plan.joint_trajectory.points[i].time_from_start = rospy.Duration.from_sec(t * (i + 1))
+        return updated_plan
 
-    def build_absolute_path_for_group(self, group_name, poses, stamp=None, eef_step=0.01, avoid_collisions=True):
+    def build_absolute_path_for_group(self, group_name, poses, stamp=None, avoid_collisions=True):
         """Given way points in a list of geometry_msgs.Pose, plan a path
         go through all way points.
 
         :param group_name: Group name for building plan
-        :param poses: List[Pose]
+        :param poses: geometry_msgs.PoseArray or List[Pose]
         :param stamp: Last time stamp from start
         :param eef_step:
         :param avoid_collisions:
@@ -246,28 +264,51 @@ class MoveGroupInterface(object):
         group_id = self._get_group_id(group_name)
         assert group_id is not None
         group = self.move_groups[group_id]
-        plan, fraction = group.compute_cartesian_path(poses, eef_step, jump_threshold=0.0,
+
+        if isinstance(poses, GeometryMsg.PoseArray):
+            poses = poses.poses
+
+        plan, fraction = group.compute_cartesian_path(poses, eef_step=0.01, jump_threshold=0.0,
                                                       avoid_collisions=avoid_collisions)
 
         if stamp:
-            plan = self._update_plan_time_stamps(plan, stamp)
+            plan = self._update_plan_time_stamps(group, plan, stamp)
 
-        # curr_state = self.commander.get_current_state()
-        # group.retime_trajectory(curr_state, plan, )
         return plan
 
-    def build_relative_path_for_group(self, group_name, poses, stamp=None, eef_step=0.01, avoid_collisions=True):
-        abs_poses = []
-        for pose in poses:
-            abs_poses.append(self._to_absolute_pose(group_name, pose))
-        return self.build_absolute_path_for_group(group_name, abs_poses, stamp, eef_step, avoid_collisions)
+    def build_relative_path_for_group(self, group_name, poses, stamp=None, avoid_collisions=True):
+        """Build a path composed by relative poses for the planning group.
 
-    def execute_plan_for_group(self, group_name, plan):
+        :param group_name: String Planning group name
+        :param poses: PoseArray or List[Pose] Each pose is relevant to the last one
+        :param stamp: Double Time stamp for the last pose
+        :param avoid_collisions:
+        :return:
+        """
+        if isinstance(poses, GeometryMsg.PoseArray):
+            poses = poses.poses
+
+        init_pose = None
+        abs_poses = []
+        for rel_pose in poses:
+            abs_pose = self._to_absolute_pose(group_name, rel_pose, init_pose)
+            abs_poses.append(abs_pose)
+            init_pose = abs_pose
+        return self.build_absolute_path_for_group(group_name, abs_poses, stamp, avoid_collisions)
+
+    def execute_plan_for_group(self, group_name, plan, wait=True):
         group_id = self._get_group_id(group_name)
         assert group_id is not None
-        return self.move_groups[group_id].execute(plan, wait=True)
+        return self.move_groups[group_id].execute(plan, wait)
 
-    def build_absolute_paths_for_all(self, all_poses, all_stamps=None):
+    def build_absolute_paths_for_all(self, all_poses, all_stamps=None, avoid_collisions=True):
+        """
+
+        :param all_poses: List[List[Pose]]
+        :param all_stamps:
+        :param avoid_collisions:
+        :return:
+        """
         all_plans = []
         if all_stamps:
             assert len(all_poses) == len(all_stamps)
@@ -276,19 +317,26 @@ class MoveGroupInterface(object):
 
         for i, poses in enumerate(all_poses):
             group_name = self.group_names[i]
-            plan = self.build_absolute_path_for_group(group_name, poses, all_stamps[i])
+            plan = self.build_absolute_path_for_group(group_name, poses, all_stamps[i], avoid_collisions)
             all_plans.append(plan)
 
         return all_plans
 
-    def build_relative_paths_for_all(self, all_poses, all_stamps=None):
+    def build_relative_paths_for_all(self, all_poses, all_stamps=None, avoid_collisions=True):
         all_abs_poses = []
-        for i, poses in enumerate(all_poses):
+        for i, rel_poses_of_group in enumerate(all_poses):
             group_name = self.group_names[i]
-            abs_poses = self._to_absolute_pose(group_name, poses)
-            all_abs_poses.append(abs_poses)
 
-        return self.build_absolute_paths_for_all(all_abs_poses, all_stamps)
+            init_pose = None
+            abs_poses_of_group = []
+            for rel_pose in rel_poses_of_group:
+                abs_pose = self._to_absolute_pose(group_name, rel_pose, init_pose)
+                abs_poses_of_group.append(abs_pose)
+                init_pose = abs_pose
+
+            all_abs_poses.append(abs_poses_of_group)
+
+        return self.build_absolute_paths_for_all(all_abs_poses, all_stamps, avoid_collisions)
 
     def execute_plans_for_all(self, plans):
         assert len(plans) == self.group_num
@@ -298,3 +346,23 @@ class MoveGroupInterface(object):
                 group.execute(plan, wait=True)
             else:
                 group.execute(plan, wait=False)
+
+    def all_go_to_pose_goals(self, goals, is_absolute, stamps=None, avoid_collision=True):
+        assert len(goals) == self.group_num
+        for i, goal in enumerate(goals):
+            group_name = self.group_names[i]
+            try:
+                stamp = stamps[i] if stamps else None
+            except IndexError:
+                stamp = None
+            if is_absolute:
+                plan = self.build_absolute_path_for_group(group_name, [goal], stamp, 0.01, avoid_collision)
+            else:
+                plan = self.build_relative_path_for_group(group_name, [goal], stamp, 0.01, avoid_collision)
+            if i == self.group_num - 1:
+                ok = self.execute_plan_for_group(group_name, plan, wait=True)
+            else:
+                ok = self.execute_plan_for_group(group_name, plan, wait=False)
+            if not ok:
+                return False
+        return True

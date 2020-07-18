@@ -1,0 +1,11 @@
+<launch>
+    <param name="/use_sim_time" value="false" />
+
+    <node pkg="roport" type="roport_moveit_server.py" name="roport_moveit_server" output="screen">
+    </node>
+
+    <node pkg="roport" type="roport_bt_port" name="roport_bt_port" output="screen">
+        <param name="tree_file" value="$(find roport)/tree/roport.xml" />
+    </node>
+
+</launch>

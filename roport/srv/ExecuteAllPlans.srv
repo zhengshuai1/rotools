@@ -1,8 +1,9 @@
 std_msgs/Header header
-bool is_relative
-float32 stamp
-float32 eef_step
-bool avoid_collisions
+string[] group_names
+bool is_absolute
+geometry_msgs/PoseArray[] all_poses
+float64[] stamps
+bool allow_collision
 ---
 uint8 SUCCEEDED=0
 uint8 FAILED=1

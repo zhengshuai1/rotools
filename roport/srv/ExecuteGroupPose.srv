@@ -1,8 +1,8 @@
 std_msgs/Header header
 string group_name
-bool is_relative
+bool is_absolute
 geometry_msgs/Pose goal
-float32 tolerance
+float64 tolerance
 ---
 uint8 SUCCEEDED=0
 uint8 FAILED=1

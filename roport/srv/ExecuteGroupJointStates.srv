@@ -1,7 +1,7 @@
 std_msgs/Header header
 string group_name
-float32[] goal
-float32 tolerance
+float64[] goal
+float64 tolerance
 ---
 uint8 SUCCEEDED=0
 uint8 FAILED=1
