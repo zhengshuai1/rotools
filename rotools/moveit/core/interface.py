@@ -258,7 +258,6 @@ class MoveGroupInterface(object):
         :param group_name: Group name for building plan
         :param poses: geometry_msgs.PoseArray or List[Pose]
         :param stamp: Last time stamp from start
-        :param eef_step:
         :param avoid_collisions:
         """
         group_id = self._get_group_id(group_name)
@@ -356,9 +355,9 @@ class MoveGroupInterface(object):
             except IndexError:
                 stamp = None
             if is_absolute:
-                plan = self.build_absolute_path_for_group(group_name, [goal], stamp, 0.01, avoid_collision)
+                plan = self.build_absolute_path_for_group(group_name, [goal], stamp, avoid_collision)
             else:
-                plan = self.build_relative_path_for_group(group_name, [goal], stamp, 0.01, avoid_collision)
+                plan = self.build_relative_path_for_group(group_name, [goal], stamp, avoid_collision)
             if i == self.group_num - 1:
                 ok = self.execute_plan_for_group(group_name, plan, wait=True)
             else:
