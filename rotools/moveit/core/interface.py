@@ -37,7 +37,7 @@ class MoveGroupInterface(object):
         self.commander = moveit_commander.RobotCommander(robot_description, ns)
         # self.scene = moveit_commander.PlanningSceneInterface(ns=ns)
 
-        assert isinstance(group_names, list)
+        assert isinstance(group_names, list), 'group_names should be list, but got {}'.format(type(group_names))
         self.group_names = group_names
         self.group_num = len(self.group_names)
         assert self.group_num >= 1
@@ -56,14 +56,20 @@ class MoveGroupInterface(object):
             for group in self.move_groups:
                 self.ref_frames.append(group.get_planning_frame())
         else:
+            assert len(ref_frames) == self.group_num
             self.ref_frames = ref_frames
+            for i, group in enumerate(self.move_groups):
+                group.set_pose_reference_frame(ref_frames[i])
 
         if not ee_links:
             self.ee_links = []
             for group in self.move_groups:
                 self.ee_links.append(group.get_end_effector_link())
         else:
+            assert len(ee_links) == self.group_num
             self.ee_links = ee_links
+            for i, group in enumerate(self.move_groups):
+                group.set_end_effector_link(self.ee_links[i])
 
         # Sometimes for debugging it is useful to print the entire state of the robot:
         print(self.commander.get_current_state())
@@ -109,7 +115,7 @@ class MoveGroupInterface(object):
     def get_current_poses_of_all_groups(self):
         """Get the eef pose in ROS format.
 
-        :return: List[pose_stamped]
+        :return: List[PoseStamped]
         """
         ret = []
         for group in self.move_groups:
@@ -120,6 +126,11 @@ class MoveGroupInterface(object):
         group_id = self._get_group_id(group_name)
         assert group_id is not None
         return self.move_groups[group_id].get_current_pose().pose
+
+    def get_frame_of_group(self, group_name):
+        group_id = self._get_group_id(group_name)
+        assert group_id is not None
+        return self.ee_links[group_id], self.ref_frames[group_id]
 
     def group_go_to_joint_states(self, group_name, goal, tolerance=0.01):
         """Set the joint states as desired.
@@ -132,11 +143,8 @@ class MoveGroupInterface(object):
         group_id = self._get_group_id(group_name)
         assert group_id is not None
         group = self.move_groups[group_id]
-
         group.go(goal, wait=True)
         group.stop()
-
-        # For testing:
         current_joints = group.get_current_joint_values()
         return common.all_close(goal, current_joints, tolerance)
 
@@ -144,12 +152,14 @@ class MoveGroupInterface(object):
         assert len(goals) == self.group_num
         for i, goal in enumerate(goals):
             if i == self.group_num - 1:
-                self.move_groups[i].go(goal, wait=True)
+                ok = self.move_groups[i].go(goal, wait=True)
             else:
-                self.move_groups[i].go(goal, wait=False)
-
+                ok = self.move_groups[i].go(goal, wait=False)
+            if not ok:
+                return False
         for group in self.move_groups:
             group.stop()
+        return True
 
     def _group_go_to_pose_goal(self, group_name, goal, tolerance=0.01):
         group_id = self._get_group_id(group_name)
@@ -175,7 +185,7 @@ class MoveGroupInterface(object):
 
         :param group_name: String Planning group name
         :param relative_pose: Pose or List[float]
-        :param init_pose:
+        :param init_pose: Initial pose of the robot before moving relatively
         :return: Pose
         """
         if not init_pose:
@@ -200,7 +210,7 @@ class MoveGroupInterface(object):
         elif isinstance(goal, GeometryMsg.Pose):
             goal_pose = goal
         else:
-            raise NotImplementedError
+            raise NotImplementedError('Goal of type {} not defined'.format(type(goal)))
 
         return self._group_go_to_pose_goal(group_name, goal_pose, tolerance)
 
@@ -216,28 +226,39 @@ class MoveGroupInterface(object):
         return self._group_go_to_pose_goal(group_name, abs_goal, tolerance)
 
     def _all_go_to_pose_goal(self, goals):
+        plans = []
         for i, goal in enumerate(goals):
             self.move_groups[i].set_pose_target(goal)
-            if i == self.group_num - 1:
-                self.move_groups[i].go(wait=True)
-            else:
-                self.move_groups[i].go(wait=False)
+            plan = self.move_groups[i].plan()
+            plans.append(plan)
 
-        for group in self.move_groups:
-            group.stop()
-            group.clear_pose_targets()
+            # if i == self.group_num - 1:
+            #     ok = self.move_groups[i].go(wait=False)
+            # else:
+            #     ok = self.move_groups[i].go(wait=False)
+            # print(i, ok)
+            # if not ok:
+            #     return False
+        for plan, group in zip(plans, self.move_groups):
+            group.execute(plan, wait=False)
+            # group.stop()
+            # group.clear_pose_targets()
+        return True
 
     def all_go_to_absolute_pose_goal(self, goals):
+        if isinstance(goals, GeometryMsg.PoseArray):
+            goals = goals.poses
         assert len(goals) == self.group_num
-        self._all_go_to_pose_goal(goals)
+        return self._all_go_to_pose_goal(goals)
 
     def all_go_to_relative_pose_goal(self, goals):
+        if isinstance(goals, GeometryMsg.PoseArray):
+            goals = goals.poses
         assert len(goals) == self.group_num
         abs_goals = []
         for name, goal in zip(self.group_names, goals):
             abs_goals.append(self._to_absolute_pose(name, goal))
-
-        self._all_go_to_pose_goal(abs_goals)
+        return self._all_go_to_pose_goal(abs_goals)
 
     def _update_plan_time_stamps(self, group, plan, stamp):
         original_stamp = plan.joint_trajectory.points[-1].time_from_start.to_sec()
@@ -263,16 +284,15 @@ class MoveGroupInterface(object):
         group_id = self._get_group_id(group_name)
         assert group_id is not None
         group = self.move_groups[group_id]
-
         if isinstance(poses, GeometryMsg.PoseArray):
             poses = poses.poses
-
-        plan, fraction = group.compute_cartesian_path(poses, eef_step=0.01, jump_threshold=0.0,
+        plan, fraction = group.compute_cartesian_path(poses, eef_step=0.01, jump_threshold=0,
                                                       avoid_collisions=avoid_collisions)
-
-        if stamp:
-            plan = self._update_plan_time_stamps(group, plan, stamp)
-
+        # move_group_interface.h  L754
+        if fraction < 0:
+            rospy.logerr('RoPort: Path planning failed.')
+        # if stamp:
+        #     plan = self._update_plan_time_stamps(group, plan, stamp)
         return plan
 
     def build_relative_path_for_group(self, group_name, poses, stamp=None, avoid_collisions=True):
@@ -286,7 +306,6 @@ class MoveGroupInterface(object):
         """
         if isinstance(poses, GeometryMsg.PoseArray):
             poses = poses.poses
-
         init_pose = None
         abs_poses = []
         for rel_pose in poses:
@@ -313,28 +332,23 @@ class MoveGroupInterface(object):
             assert len(all_poses) == len(all_stamps)
         else:
             all_stamps = [None] * len(all_poses)
-
         for i, poses in enumerate(all_poses):
             group_name = self.group_names[i]
             plan = self.build_absolute_path_for_group(group_name, poses, all_stamps[i], avoid_collisions)
             all_plans.append(plan)
-
         return all_plans
 
     def build_relative_paths_for_all(self, all_poses, all_stamps=None, avoid_collisions=True):
         all_abs_poses = []
         for i, rel_poses_of_group in enumerate(all_poses):
             group_name = self.group_names[i]
-
             init_pose = None
             abs_poses_of_group = []
             for rel_pose in rel_poses_of_group:
                 abs_pose = self._to_absolute_pose(group_name, rel_pose, init_pose)
                 abs_poses_of_group.append(abs_pose)
                 init_pose = abs_pose
-
             all_abs_poses.append(abs_poses_of_group)
-
         return self.build_absolute_paths_for_all(all_abs_poses, all_stamps, avoid_collisions)
 
     def execute_plans_for_all(self, plans):
@@ -342,11 +356,16 @@ class MoveGroupInterface(object):
         for i, plan in enumerate(plans):
             group = self.move_groups[i]
             if i == len(plans) - 1:
-                group.execute(plan, wait=True)
+                ok = group.execute(plan, wait=True)
             else:
-                group.execute(plan, wait=False)
+                ok = group.execute(plan, wait=False)
+            if not ok:
+                return False
+        return True
 
     def all_go_to_pose_goals(self, goals, is_absolute, stamps=None, avoid_collision=True):
+        if isinstance(goals, GeometryMsg.PoseArray):
+            goals = goals.poses
         assert len(goals) == self.group_num
         for i, goal in enumerate(goals):
             group_name = self.group_names[i]
@@ -355,6 +374,7 @@ class MoveGroupInterface(object):
             except IndexError:
                 stamp = None
             if is_absolute:
+                print(goal)
                 plan = self.build_absolute_path_for_group(group_name, [goal], stamp, avoid_collision)
             else:
                 plan = self.build_relative_path_for_group(group_name, [goal], stamp, avoid_collision)

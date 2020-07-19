@@ -29,10 +29,10 @@ class MoveItServer(object):
         self._srv_group_pose = rospy.Service('execute_group_pose', ExecuteGroupPose, self.group_pose_handle)
         self._srv_group_js = rospy.Service('execute_group_joint_states', ExecuteGroupJointStates, self.group_js_handle)
         self._srv_group_home = rospy.Service('execute_group_home', ExecuteGroupJointStates, self.group_home_handle)
-
-        self._srv_al_poses = rospy.Service('execute_all_group_poses', ExecuteAllPoses, self.all_poses_handle)
-        # self._ajs_server = rospy.Service('execute_all_joint_states', AllJointStates, self.all_joint_states_handle)
         self._srv_group_plan = rospy.Service('execute_group_plan', ExecuteGroupPlan, self.group_plan_handle)
+
+        self._srv_al_poses = rospy.Service('execute_all_poses', ExecuteAllPoses, self.all_poses_handle)
+        # self._ajs_server = rospy.Service('execute_all_joint_states', AllJointStates, self.all_joint_states_handle)
         self._srv_all_plans = rospy.Service('execute_all_plans', ExecuteAllPlans, self.all_plans_handle)
 
     def get_all_names_handle(self, req):
@@ -58,8 +58,8 @@ class MoveItServer(object):
     def get_pose_handle(self, req):
         resp = GetGroupPoseResponse()
         try:
-            pose = self.interface.get_current_pose_of_group(req.group_name)
-            resp.pose = pose
+            resp.pose = self.interface.get_current_pose_of_group(req.group_name)
+            resp.ee_link, resp.ref_link = self.interface.get_frame_of_group(req.group_name)
             resp.result_status = resp.SUCCEEDED
         except IndexError:
             resp.result_status = resp.FAILED
@@ -120,7 +120,11 @@ class MoveItServer(object):
         return resp
 
     def all_poses_handle(self, req):
-        ok = self.interface.all_go_to_pose_goals(req.goals, req.is_absolute, req.stamps, not req.allow_collision)
+        if req.is_absolute:
+            ok = self.interface.all_go_to_absolute_pose_goal(req.goals)
+        else:
+            ok = self.interface.all_go_to_relative_pose_goal(req.goals)
+        # ok = self.interface.all_go_to_pose_goals(req.goals, req.is_absolute, req.stamps, not req.allow_collision)
         resp = ExecuteAllPosesResponse()
         resp.result_status = resp.SUCCEEDED if ok else resp.FAILED
         return resp
