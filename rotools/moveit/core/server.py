@@ -32,7 +32,6 @@ class MoveItServer(object):
         self._srv_group_plan = rospy.Service('execute_group_plan', ExecuteGroupPlan, self.group_plan_handle)
 
         self._srv_al_poses = rospy.Service('execute_all_poses', ExecuteAllPoses, self.all_poses_handle)
-        # self._ajs_server = rospy.Service('execute_all_joint_states', AllJointStates, self.all_joint_states_handle)
         self._srv_all_plans = rospy.Service('execute_all_plans', ExecuteAllPlans, self.all_plans_handle)
 
     def get_all_names_handle(self, req):
@@ -131,9 +130,10 @@ class MoveItServer(object):
 
     def all_plans_handle(self, req):
         if req.is_absolute:
-            ok = self.interface.build_absolute_paths_for_all(req.all_poses, req.stamps, not req.allow_collision)
+            all_plans = self.interface.build_absolute_paths_for_all(req.all_poses, req.stamps, not req.allow_collision)
         else:
-            ok = self.interface.build_relative_paths_for_all(req.all_poses, req.stamps, not req.allow_collision)
+            all_plans = self.interface.build_relative_paths_for_all(req.all_poses, req.stamps, not req.allow_collision)
+        ok = self.interface.execute_plans_for_all(all_plans)
         resp = ExecuteAllPlansResponse()
         resp.result_status = resp.SUCCEEDED if ok else resp.FAILED
         return resp

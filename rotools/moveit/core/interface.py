@@ -32,8 +32,6 @@ class MoveGroupInterface(object):
         super(MoveGroupInterface, self).__init__()
 
         moveit_commander.roscpp_initialize(sys.argv)
-        print(robot_description, ns, group_names)
-
         self.commander = moveit_commander.RobotCommander(robot_description, ns)
         # self.scene = moveit_commander.PlanningSceneInterface(ns=ns)
 
@@ -151,10 +149,7 @@ class MoveGroupInterface(object):
     def all_go_to_joint_states(self, goals):
         assert len(goals) == self.group_num
         for i, goal in enumerate(goals):
-            if i == self.group_num - 1:
-                ok = self.move_groups[i].go(goal, wait=True)
-            else:
-                ok = self.move_groups[i].go(goal, wait=False)
+            ok = self.move_groups[i].go(goal, wait=True)
             if not ok:
                 return False
         for group in self.move_groups:
@@ -232,17 +227,12 @@ class MoveGroupInterface(object):
             plan = self.move_groups[i].plan()
             plans.append(plan)
 
-            # if i == self.group_num - 1:
-            #     ok = self.move_groups[i].go(wait=False)
-            # else:
-            #     ok = self.move_groups[i].go(wait=False)
-            # print(i, ok)
-            # if not ok:
-            #     return False
         for plan, group in zip(plans, self.move_groups):
-            group.execute(plan, wait=False)
-            # group.stop()
-            # group.clear_pose_targets()
+            group.execute(plan, wait=True)
+
+        for group in self.move_groups:
+            group.stop()
+            group.clear_pose_targets()
         return True
 
     def all_go_to_absolute_pose_goal(self, goals):
@@ -265,7 +255,6 @@ class MoveGroupInterface(object):
         # points_num = len(plan.joint_trajectory.points)
         velocity_scale = original_stamp / stamp
         acceleration_scale = velocity_scale
-        print('velocity_scale ', velocity_scale)
         curr_state = self.commander.get_current_state()
         updated_plan = group.retime_trajectory(curr_state, plan, velocity_scale, acceleration_scale)
         # for i in range(points_num):
@@ -291,8 +280,8 @@ class MoveGroupInterface(object):
         # move_group_interface.h  L754
         if fraction < 0:
             rospy.logerr('RoPort: Path planning failed.')
-        # if stamp:
-        #     plan = self._update_plan_time_stamps(group, plan, stamp)
+        if stamp:
+            plan = self._update_plan_time_stamps(group, plan, stamp)
         return plan
 
     def build_relative_path_for_group(self, group_name, poses, stamp=None, avoid_collisions=True):
@@ -322,17 +311,20 @@ class MoveGroupInterface(object):
     def build_absolute_paths_for_all(self, all_poses, all_stamps=None, avoid_collisions=True):
         """
 
-        :param all_poses: List[List[Pose]]
+        :param all_poses: List[List[Pose]] or List[PoseArray]
         :param all_stamps:
         :param avoid_collisions:
         :return:
         """
         all_plans = []
         if all_stamps:
-            assert len(all_poses) == len(all_stamps)
+            assert len(all_poses) == len(all_stamps), \
+                "all_poses len {} is not equal to all_stamps len {}".format(len(all_poses), len(all_stamps))
         else:
             all_stamps = [None] * len(all_poses)
         for i, poses in enumerate(all_poses):
+            if isinstance(poses, GeometryMsg.PoseArray):
+                poses = poses.poses
             group_name = self.group_names[i]
             plan = self.build_absolute_path_for_group(group_name, poses, all_stamps[i], avoid_collisions)
             all_plans.append(plan)
@@ -340,11 +332,13 @@ class MoveGroupInterface(object):
 
     def build_relative_paths_for_all(self, all_poses, all_stamps=None, avoid_collisions=True):
         all_abs_poses = []
-        for i, rel_poses_of_group in enumerate(all_poses):
+        for i, rel_poses in enumerate(all_poses):
+            if isinstance(rel_poses, GeometryMsg.PoseArray):
+                rel_poses = rel_poses.poses
             group_name = self.group_names[i]
             init_pose = None
             abs_poses_of_group = []
-            for rel_pose in rel_poses_of_group:
+            for rel_pose in rel_poses:
                 abs_pose = self._to_absolute_pose(group_name, rel_pose, init_pose)
                 abs_poses_of_group.append(abs_pose)
                 init_pose = abs_pose
@@ -355,10 +349,7 @@ class MoveGroupInterface(object):
         assert len(plans) == self.group_num
         for i, plan in enumerate(plans):
             group = self.move_groups[i]
-            if i == len(plans) - 1:
-                ok = group.execute(plan, wait=True)
-            else:
-                ok = group.execute(plan, wait=False)
+            ok = group.execute(plan, wait=True)
             if not ok:
                 return False
         return True
@@ -374,14 +365,11 @@ class MoveGroupInterface(object):
             except IndexError:
                 stamp = None
             if is_absolute:
-                print(goal)
                 plan = self.build_absolute_path_for_group(group_name, [goal], stamp, avoid_collision)
             else:
                 plan = self.build_relative_path_for_group(group_name, [goal], stamp, avoid_collision)
-            if i == self.group_num - 1:
-                ok = self.execute_plan_for_group(group_name, plan, wait=True)
-            else:
-                ok = self.execute_plan_for_group(group_name, plan, wait=False)
+
+            ok = self.execute_plan_for_group(group_name, plan, wait=True)
             if not ok:
                 return False
         return True

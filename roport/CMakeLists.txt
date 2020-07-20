@@ -15,6 +15,10 @@ find_package(catkin REQUIRED COMPONENTS
   geometry_msgs
   message_generation
   behaviortree_cpp_v3
+  moveit_core
+  moveit_ros_planning
+  moveit_ros_planning_interface
+  moveit_ros_perception
 )
 
 ## System dependencies are found with CMake's conventions
@@ -95,6 +99,7 @@ include_directories(include ${catkin_INCLUDE_DIRS})
 # Declare a C++ library
 add_library(${PROJECT_NAME}
   src/lib/rosout_logger.cpp
+  src/lib/moveit_interface.cpp
 )
 target_link_libraries(${PROJECT_NAME}
   ${catkin_LIBRARIES}
@@ -103,6 +108,13 @@ target_link_libraries(${PROJECT_NAME}
 add_executable(roport_bt_port src/roport_bt_port.cpp)
 add_dependencies(roport_bt_port ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 target_link_libraries(roport_bt_port
+  ${catkin_LIBRARIES}
+  ${PROJECT_NAME}
+)
+
+add_executable(roport_moveit_server src/roport_moveit_server.cpp)
+add_dependencies(roport_moveit_server ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+target_link_libraries(roport_moveit_server
   ${catkin_LIBRARIES}
   ${PROJECT_NAME}
 )

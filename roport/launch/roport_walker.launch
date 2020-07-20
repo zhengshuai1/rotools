@@ -6,6 +6,12 @@
         <rosparam param="ee_links">['left_tcp', 'right_tcp']</rosparam>
     </node>
 
+<!--    <node pkg="roport" type="roport_moveit_server" name="roport_moveit_cpp_server" output="screen">-->
+<!--        <rosparam param="group_names">['walker_left_arm', 'walker_right_arm']</rosparam>-->
+<!--        <rosparam param="ee_links">['left_tcp', 'right_tcp']</rosparam>-->
+<!--        <rosparam param="ref_frames">['base_link', 'base_link']</rosparam>-->
+<!--    </node>-->
+
     <node pkg="roport" type="roport_bt_port" name="roport_bt_port" output="screen">
         <param name="tree_file" value="$(find roport)/tree/roport_walker_demo.xml" />
     </node>
