@@ -1,6 +1,14 @@
 # RoPort
 
-RoPort is a middleware that bridges the RoTools interface with ROS environment.
+RoPort is a middleware that allows using RoTools interface in ROS environment.
+
+It provides: 
+
+A MoveIt server for controlling the robot's kinematic chains.
+
+A BehaviorTree based task scheduler.
+
+Hardware/Simulation interfaces with multiple robots.
 
 # Pre-requests
 
@@ -10,18 +18,18 @@ sudo apt-get install ros-melodic-behaviortree-cpp-v3
 
 # Usage
 
-Demo with Franka Panda robot:
+MoveIt demo with Franka Panda robot:
 
 ```
 roslaunch panda_moveit_config demo.launch
-roslaunch roport roport_panda.launch
+roslaunch roport roport_moveit_panda.launch
 ```
 
-Demo with UBTech Walker robot:
+MoveIt demo with UBTech Walker robot:
 
 ```
 roslaunch walker_moveit_config demo.launch
-roslaunch roport roport_walker.launch
+roslaunch roport roport_moveit_walker.launch
 ```
 
 # Note

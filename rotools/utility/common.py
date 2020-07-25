@@ -151,3 +151,19 @@ def to_ros_plan(t, p, v=None, a=None):
         msg.joint_trajectory.points.append(wpt)
 
     return msg
+
+
+def get_param(name, value=None):
+    """Get ros param from param server
+
+    :param name: String Param name
+    :param value: Return value if param is not set
+    :return:
+    """
+    private = "~%s" % name
+    if rospy.has_param(private):
+        return rospy.get_param(private)
+    elif rospy.has_param(name):
+        return rospy.get_param(name)
+    else:
+        return value

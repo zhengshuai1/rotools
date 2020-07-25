@@ -12,7 +12,7 @@
 <!--        <rosparam param="ref_frames">['base_link', 'base_link']</rosparam>-->
 <!--    </node>-->
 
-    <node pkg="roport" type="roport_bt_port" name="roport_bt_port" output="screen">
+    <node pkg="roport" type="roport_task_scheduler" name="roport_task_scheduler" output="screen">
         <param name="tree_file" value="$(find roport)/tree/roport_walker_demo.xml" />
     </node>
 

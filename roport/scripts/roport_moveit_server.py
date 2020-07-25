@@ -4,15 +4,17 @@ from __future__ import print_function
 import rospy
 
 from rotools.moveit.core.server import MoveItServer
+from rotools.utility.common import get_param
 
 
 if __name__ == "__main__":
     try:
         rospy.init_node('roport_moveit_server')
         # You only need to modify the config to apply this to new robots
-        group_names = rospy.get_param('~group_names')
-        ee_links = rospy.get_param('~ee_links') if rospy.has_param('~ee_links') else None
-        ref_frames = rospy.get_param('~ref_frames') if rospy.has_param('~ref_frames') else None
+        group_names = get_param('~group_names')
+        assert group_names is not None
+        ee_links = get_param('~ee_links')
+        ref_frames = get_param('~ref_frames')
         config = {
             'robot_description': 'robot_description',
             'ns': '',
