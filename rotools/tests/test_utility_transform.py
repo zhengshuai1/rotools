@@ -53,7 +53,7 @@ class Test(unittest.TestCase):
 
         """
         Commonly used rotation quaternions along z axis
-        45 deg: [0.         0.         0.70710678 0.70710678]
+        45 deg: [0.         0.         0.38268343 0.92387953]
         90 deg: [0.         0.         0.70710678 0.70710678]
         180 deg: [0.000000e+00 0.000000e+00 1.000000e+00 6.123234e-17]
         270 deg: [ 0.          0.         -0.70710678  0.70710678]

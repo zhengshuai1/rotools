@@ -1,12 +1,5 @@
-#include <algorithm>
-#include <array>
-#include <atomic>
-#include <string>
-#include <utility>
-
 #include <ros/ros.h>
 
-#include "roport/robot_interface.h"
 #include "roport/mz25_webots_interface.h"
 
 
@@ -17,7 +10,7 @@ int main(int argc, char** argv) {
 
   roport::MZ25WebotsInterface robot_interface(nh);
 
-  ros::AsyncSpinner spinner(4);
+  ros::AsyncSpinner spinner(2);
   spinner.start();
   ros::waitForShutdown();
 

@@ -1,5 +1,5 @@
-#ifndef ROPORT_WEBOTS_INTERFACE_H
-#define ROPORT_WEBOTS_INTERFACE_H
+#ifndef ROPORT_MZ25_WEBOTS_INTERFACE_H
+#define ROPORT_MZ25_WEBOTS_INTERFACE_H
 
 #include <hardware_interface/joint_state_interface.h>
 #include <hardware_interface/joint_command_interface.h>
@@ -49,7 +49,7 @@ namespace roport
     std::timed_mutex jointStatesMutex;
 
     // Shared memory
-    std::array<std::string, 6> jointNames;
+    std::vector<std::string> jointNames;
     std::vector<double> currentJointPosition;
     std::vector<double> currentJointVelocity;
     std::vector<double> currentJointEffort;

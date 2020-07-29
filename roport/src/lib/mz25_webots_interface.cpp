@@ -10,7 +10,8 @@ namespace roport
     init();
     ROS_INFO("Init completed");
     controllerManager_ = std::make_shared<controller_manager::ControllerManager>(this, nh_);
-    double loop_hz_ = 100;
+    double loop_hz_;
+    nh_.param("/mz25/hardware_interface/loop_hz", loop_hz_, 100.0);  //default 100Hz
     non_realtime_loop_ = nh_.createTimer(ros::Duration(1.0/loop_hz_), &MZ25WebotsInterface::update, this);
     ROS_INFO("Loop started");
   }
@@ -19,16 +20,24 @@ namespace roport
 
   void MZ25WebotsInterface::init()
   {
-    // The names are defined in the webots api
-    jointNames = {"shoulder_joint", "upperArm_joint", "foreArm_joint",
-                  "wrist1_joint", "wrist2_joint", "wrist3_joint"};
+    std::vector<std::string> joint_names;
+    nh_.getParam("/mz25/hardware_interface/joints", joint_names);
+    if (joint_names.size() != 6) {
+      throw std::runtime_error("No valid joint names");
+    } else {
+      jointNames.insert(jointNames.end(), joint_names.begin(), joint_names.end());
+      if (jointNames.size() != 6) {
+        throw std::runtime_error("Joint name initialization failed");
+      }
+      ROS_INFO("Joint names initialized.");
+    }
 
     jointStatesSubscriber = nh_.subscribe(
-      "mz25/measured_joint_states", 1, &MZ25WebotsInterface::jointStatesCb, this
+      "/mz25/measured_joint_states", 1, &MZ25WebotsInterface::jointStatesCb, this
     );
     ROS_INFO_STREAM("Subscribed to joint states");
 
-    jointPositionCmdPublisher = nh_.advertise<sensor_msgs::JointState>("mz25/joint_states_cmd", 1);
+    jointPositionCmdPublisher = nh_.advertise<sensor_msgs::JointState>("/mz25/joint_states_cmd", 1);
     ROS_INFO_STREAM("Registered joint controllers");
 
     // Resize vectors
@@ -65,6 +74,8 @@ namespace roport
     ///ROS_INFO("Looping");
     ros::Duration elapsed_time_ = ros::Duration(e.current_real - e.last_real);
     read();
+    ros::Time t = ros::Time::now();
+    ROS_DEBUG("Time for now: %f, elapsed: %f|", t.toSec(), elapsed_time_.toSec());
     controllerManager_->update(ros::Time::now(), elapsed_time_);
     write(elapsed_time_);
   }
@@ -87,7 +98,7 @@ namespace roport
         //ROS_INFO_STREAM("Got state of joint "<<jointNames[i]);
       }
       catch(std::out_of_range& e) {
-        ROS_WARN_STREAM("Failed to get joint "<<jointNames[i]<<" state, no message received yet");
+        ROS_WARN_STREAM("Failed to get joint " << jointNames[i] << " state, no message received yet");
       }
     }
   }
@@ -109,18 +120,24 @@ namespace roport
       if (jointNames[i] == jointName)
         return jointPositionCommand[i];
     }
+    ROS_ERROR("Get joint position cmd for %s failed", jointName.c_str());
     return 0;
   }
 
   void MZ25WebotsInterface::jointStatesCb(const sensor_msgs::JointState::ConstPtr& msg)
   {
-    std::unique_lock<std::timed_mutex> lock(jointStatesMutex, std::chrono::seconds(10));
+    std::unique_lock<std::timed_mutex> lock(jointStatesMutex, std::chrono::seconds(2));
     if (!lock) {
       ROS_ERROR("Couldn't acquire mutex, couldn't set joint state");
       return;
     }
-    for (int i = 0; i < jointNames.size(); i++)
-      jointStates[jointNames[i]] = std::vector<double>({msg->position.at(i), msg->velocity.at(i), msg->effort.at(i)});
+    try {
+      // Make sure velocity and effort are not empty in hardware or simulator API output
+      for (int i = 0; i < jointNames.size(); i++)
+        jointStates[jointNames[i]] = std::vector<double>({msg->position.at(i), msg->velocity.at(i), msg->effort.at(i)});
+    } catch (const std::out_of_range& oor) {
+      ROS_ERROR_STREAM("Out of Range error: " << oor.what() << '\n');
+    }
   }
 
   void MZ25WebotsInterface::sendJointPositionCmd(double j1, double j2, double j3, double j4, double j5, double j6)

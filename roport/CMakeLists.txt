@@ -1,6 +1,11 @@
 cmake_minimum_required(VERSION 3.0.2)
 project(roport)
 
+#Comment this if don't want debug
+set(CMAKE_BUILD_TYPE Debug)
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -O0")
+set(CMAKE_C_FLAGS_DEBUG "${CMAKE_C_FLAGS_DEBUG} -O0")
+
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -19,6 +24,9 @@ find_package(catkin REQUIRED COMPONENTS
   moveit_ros_planning
   moveit_ros_planning_interface
   moveit_ros_perception
+  hardware_interface
+  controller_manager
+  ubt_core_msgs
 )
 
 ## System dependencies are found with CMake's conventions
@@ -66,6 +74,7 @@ generate_messages(
   DEPENDENCIES
   std_msgs
   geometry_msgs
+  ubt_core_msgs
 )
 
 ################################################
@@ -100,14 +109,19 @@ include_directories(include ${catkin_INCLUDE_DIRS})
 add_library(${PROJECT_NAME}
   src/lib/rosout_logger.cpp
   src/lib/moveit_interface.cpp
+  src/lib/robot_interface.cpp
+  src/lib/duration.cpp
+  src/lib/control_types.cpp
+  src/lib/webots_interface.cpp
+  src/lib/mz25_webots_interface.cpp
 )
 target_link_libraries(${PROJECT_NAME}
   ${catkin_LIBRARIES}
 )
 
-add_executable(roport_bt_port src/roport_bt_port.cpp)
-add_dependencies(roport_bt_port ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
-target_link_libraries(roport_bt_port
+add_executable(roport_task_scheduler src/roport_task_scheduler.cpp)
+add_dependencies(roport_task_scheduler ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+target_link_libraries(roport_task_scheduler
   ${catkin_LIBRARIES}
   ${PROJECT_NAME}
 )
@@ -115,6 +129,20 @@ target_link_libraries(roport_bt_port
 add_executable(roport_moveit_server src/roport_moveit_server.cpp)
 add_dependencies(roport_moveit_server ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 target_link_libraries(roport_moveit_server
+  ${catkin_LIBRARIES}
+  ${PROJECT_NAME}
+)
+
+add_executable(roport_walker_webots_interface src/roport_walker_webots_interface.cpp)
+add_dependencies(roport_walker_webots_interface ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+target_link_libraries(roport_walker_webots_interface
+  ${catkin_LIBRARIES}
+  ${PROJECT_NAME}
+)
+
+add_executable(roport_mz25_webots_interface src/roport_mz25_webots_interface.cpp)
+add_dependencies(roport_mz25_webots_interface ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+target_link_libraries(roport_mz25_webots_interface
   ${catkin_LIBRARIES}
   ${PROJECT_NAME}
 )
