@@ -1,17 +1,17 @@
 # RoTools
 
-A robot toolbox belonging to the **RoUniverse**, which is a personal project aiming
-at developing handy robotic related tools during learning and implementing.
+A robot toolbox being part of the **RoUniverse**, a personal project aiming
+at developing handy robotic tools for studying and engineering purposes.
 
-RoTools is compatible with both Python 2.7 and 3.7+
+RoTools is compatible with both Python 2.7 and 3.6+
 
 Author: Zhipeng Dong
 
 ## Install
 
-Place the root folder to `/home/USER`
+Put the root folder of this repo in `ROTOOLS_ROOT` dir.
 
-Add `export PYTHONPATH=${PYTHONPATH}:/home/USER/rotools` into the bashrc.
+Add `export PYTHONPATH=${PYTHONPATH}:ROTOOLS_ROOT` into the bashrc file.
 
 You may need to `source ~/.bashrc` for new terminal.
 
@@ -50,7 +50,7 @@ RoPort is a ROS package that bridge the RoTools interface with ROS. This package
 be placed in the catkin_ws/src during usage, or better, you could create a symlink
 to it like this:
 
-`ln -s /home/dzp/rotools/roport/ /home/dzp/catkin_ws/src/`
+`ln -s ROTOOLS_ROOT/roport/ ~/catkin_ws/src/`
 
 ## Coding Guide
 

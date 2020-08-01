@@ -35,7 +35,9 @@ class MoveGroupInterface(object):
         self.commander = moveit_commander.RobotCommander(robot_description, ns)
         # self.scene = moveit_commander.PlanningSceneInterface(ns=ns)
 
-        assert isinstance(group_names, list), 'group_names should be list, but got {}'.format(type(group_names))
+        if not isinstance(group_names, list) and not isinstance(group_names, tuple):
+            raise TypeError('group_names should be list or tuple, but got {}'.format(type(group_names)))
+
         self.group_names = group_names
         self.group_num = len(self.group_names)
         assert self.group_num >= 1
@@ -43,7 +45,7 @@ class MoveGroupInterface(object):
         # We can get a list of all the groups in the robot:
         all_group_names = self.commander.get_group_names()
         for name in self.group_names:
-            assert name in all_group_names, 'Group name {} is not exist'.format(name)
+            assert name in all_group_names, 'Group name {} does not exist'.format(name)
 
         self.move_groups = []
         for name in self.group_names:
@@ -83,6 +85,12 @@ class MoveGroupInterface(object):
             if name == group_name:
                 return i
         return None
+
+    def _get_group_by_name(self, group_name):
+        for i, name in enumerate(self.group_names):
+            if name == group_name:
+                return self.move_groups[i]
+        raise IndexError
 
     def get_active_joint_names_of_all_groups(self):
         ret = []
@@ -125,18 +133,22 @@ class MoveGroupInterface(object):
         assert group_id is not None
         return self.move_groups[group_id].get_current_pose().pose
 
+    def get_current_position_of_group(self, group_name):
+        current_pose = self.get_current_pose_of_group(group_name)
+        return current_pose.position
+
     def get_frame_of_group(self, group_name):
         group_id = self._get_group_id(group_name)
         assert group_id is not None
         return self.ee_links[group_id], self.ref_frames[group_id]
 
     def group_go_to_joint_states(self, group_name, goal, tolerance=0.01):
-        """Set the joint states as desired.
+        """Set the joint states of a group as goal.
 
-        :param group_name: Controlled group name
-        :param goal: joint state list
-        :param tolerance:
-        :return:
+        :param group_name: str Controlled group name
+        :param goal: list Joint states
+        :param tolerance: float
+        :return: bool
         """
         group_id = self._get_group_id(group_name)
         assert group_id is not None
@@ -157,10 +169,14 @@ class MoveGroupInterface(object):
         return True
 
     def _group_go_to_pose_goal(self, group_name, goal, tolerance=0.01):
-        group_id = self._get_group_id(group_name)
-        assert group_id is not None
-        group = self.move_groups[group_id]
+        """Set the pose of the tcp of a group as goal.
 
+        :param group_name:
+        :param goal:
+        :param tolerance:
+        :return:
+        """
+        group = self._get_group_by_name(group_name)
         group.set_pose_target(goal)
         try:
             group.go(wait=True)
@@ -176,9 +192,9 @@ class MoveGroupInterface(object):
         return common.all_close(goal, current_pose, tolerance)
 
     def _to_absolute_pose(self, group_name, relative_pose, init_pose=None):
-        """Convert a pose wrt eef to base_link.
+        """Convert a relative pose in eef frame to base frame.
 
-        :param group_name: String Planning group name
+        :param group_name: str Planning group name
         :param relative_pose: Pose or List[float]
         :param init_pose: Initial pose of the robot before moving relatively
         :return: Pose
@@ -193,23 +209,30 @@ class MoveGroupInterface(object):
         return common.to_ros_pose(absolute_pose_mat)
 
     def group_go_to_absolute_pose_goal(self, group_name, goal, tolerance=0.01):
-        """Move group to the desired pose wrt the ref_frame
+        """Move group to the goal pose wrt the base frame
 
         :param group_name: Controlled group name
         :param goal: geometry_msgs.msg.Pose or PoseStamped
         :param tolerance:
-        :return: if goal reached
+        :return: whether goal reached
         """
         if isinstance(goal, GeometryMsg.PoseStamped):
             goal_pose = goal.pose
         elif isinstance(goal, GeometryMsg.Pose):
             goal_pose = goal
         else:
-            raise NotImplementedError('Goal of type {} not defined'.format(type(goal)))
+            raise NotImplementedError('Goal of type {} is not defined'.format(type(goal)))
 
         return self._group_go_to_pose_goal(group_name, goal_pose, tolerance)
 
     def group_go_to_relative_pose_goal(self, group_name, goal, tolerance=0.01):
+        """Move group to the goal pose wrt the eef frame
+
+        :param group_name:
+        :param goal:
+        :param tolerance:
+        :return:
+        """
         if isinstance(goal, GeometryMsg.PoseStamped):
             goal_pose = goal.pose
         elif isinstance(goal, GeometryMsg.Pose):
@@ -219,6 +242,91 @@ class MoveGroupInterface(object):
 
         abs_goal = self._to_absolute_pose(group_name, goal_pose)
         return self._group_go_to_pose_goal(group_name, abs_goal, tolerance)
+
+    def _group_go_to_position_goal(self, group_name, goal, tolerance=0.01):
+        """Set the position of the tcp of a group as goal.
+
+        :param group_name:
+        :param goal:
+        :param tolerance:
+        :return:
+        """
+        group_id = self._get_group_id(group_name)
+        assert group_id is not None
+        group = self.move_groups[group_id]
+
+        group.set_position_target(goal)
+        try:
+            group.go(wait=True)
+        except self.commander.MoveItCommanderException:
+            group.stop()
+            group.clear_pose_targets()
+            return False
+
+        group.stop()
+        group.clear_pose_targets()
+
+        current_position = self.get_current_position_of_group(group_name)
+        return common.all_close(goal, current_position, tolerance)
+
+    def _to_absolute_position(self, group_name, relative_position, init_position=None):
+        """Convert a relative position in eef frame to base frame.
+
+        :param group_name: str Planning group name
+        :param relative_position: Pose or List[float]
+        :param init_position: Initial position of the robot before moving relatively
+        :return: Pose
+        """
+        if not init_position:
+            current_position = self.get_current_position_of_group(group_name)
+        else:
+            current_position = init_position
+        current_position = common.sd_position(current_position)
+        relative_position = common.sd_position(relative_position)
+        absolute_position = current_position + relative_position
+        return absolute_position
+
+    def group_go_to_absolute_position_goal(self, group_name, goal, tolerance=0.001):
+        goal = common.sd_position(goal)
+        return self._group_go_to_position_goal(group_name, goal, tolerance)
+
+    def group_go_to_relative_position_goal(self, group_name, goal, tolerance=0.001):
+        goal = common.sd_position(goal)
+        abs_goal = self._to_absolute_position(group_name, goal)
+        return self._group_go_to_position_goal(group_name, abs_goal, tolerance)
+
+    def group_shift(self, group_name, axis, goal):
+        """Move the group along given axis and shift goal
+
+        :param group_name:
+        :param axis: Could be x y z r p y
+        :param goal: float
+        :return:
+        """
+        group = self._get_group_by_name(group_name)
+        # 0,1,2,3,4,5 for x y z roll pitch yaw
+        axis_list = ['x', 'y', 'z', 'roll', 'pitch', 'yaw']
+        axis_id = -1
+        for i, a in enumerate(axis_list):
+            if a == axis:
+                axis_id = i
+                break
+
+        if axis_id < 0:
+            raise NotImplementedError
+
+        group.shift_pose_target(axis_id, goal)
+
+        try:
+            group.go(wait=True)
+        except self.commander.MoveItCommanderException:
+            group.stop()
+            group.clear_pose_targets()
+            return False
+
+        group.stop()
+        group.clear_pose_targets()
+        return True
 
     def _all_go_to_pose_goal(self, goals):
         plans = []
@@ -279,7 +387,7 @@ class MoveGroupInterface(object):
                                                       avoid_collisions=avoid_collisions)
         # move_group_interface.h  L754
         if fraction < 0:
-            rospy.logerr('RoPort: Path planning failed.')
+            rospy.logerr('Path planning failed.')
         if stamp:
             plan = self._update_plan_time_stamps(group, plan, stamp)
         return plan

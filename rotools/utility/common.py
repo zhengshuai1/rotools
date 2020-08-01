@@ -18,13 +18,15 @@ def all_close(goal, actual, tolerance):
 
     :param goal: A list of floats, a Pose or a PoseStamped
     :param actual: A list of floats, a Pose or a PoseStamped
-    :param tolerance: A float
+    :param tolerance: float
     :returns: bool
     """
     if type(goal) is list or type(goal) is tuple:
         if not np.allclose(goal, actual, atol=tolerance):
             print('Goal not reached!')
             return False
+    elif isinstance(goal, np.ndarray) and isinstance(actual, np.ndarray):
+        return all_close(list(goal), list(actual), tolerance)
     elif type(goal) is GeometryMsg.PoseStamped:
         return all_close(goal.pose, actual.pose, tolerance)
     elif type(goal) is GeometryMsg.Pose:
@@ -38,6 +40,15 @@ def all_close(goal, actual, tolerance):
 
 def sd_joint_state():
     pass
+
+
+def offset_ros_pose(pose, offset):
+    output = GeometryMsg.Pose()
+    output.position.x  = pose.position.x + offset[0]
+    output.position.y  = pose.position.y + offset[1]
+    output.position.z  = pose.position.z + offset[2]
+    output.orientation = pose.orientation
+    return output
 
 
 def regularize_pose(pose):
@@ -120,6 +131,20 @@ def to_ros_pose(pose):
             return msg
         else:
             raise NotImplementedError
+    else:
+        raise NotImplementedError
+
+
+def sd_position(position):
+    if isinstance(position, np.ndarray):
+        if position.shape == (3,):
+            return position
+        else:
+            raise NotImplementedError
+    elif isinstance(position, list):
+        return sd_position(np.array(position))
+    elif isinstance(position, GeometryMsg.Point):
+        return sd_position(np.array([position.x, position.y, position.z]))
     else:
         raise NotImplementedError
 

@@ -21,11 +21,15 @@ class Test(unittest.TestCase):
         15 * np.pi / 180, (0, 1, 0)  [0.         0.13052619 0.         0.99144486 ]
         20 * np.pi / 180, (0, 1, 0)  [0.         0.17364818 0.         0.98480775]
         40 * np.pi / 180, (0, 1, 0)  [0.         0.34202014 0.         0.93969262]
-
+        90 * np.pi / 180, (0, 1, 0)  [0.         0.70710678 0.         0.70710678]
+        -90 * np.pi / 180, (0, 1, 0)  [0.         -0.70710678 0.         0.70710678]
         """
-        R = transform.rotation_matrix(40 * np.pi / 180, (0, 1, 0))
-        R = transform.rotation_matrix(15 * np.pi / 180, (0, 1, 0))
+        R = transform.rotation_matrix(-180 * np.pi / 180, (1, 0, 0))
         # print(np.array2string(R, separator=', '))
+        x_20 = transform.quaternion_from_matrix(R)
+        print(x_20)
+
+        R = transform.euler_matrix(180 * np.pi / 180., 0, 90 * np.pi / 180.)
         x_20 = transform.quaternion_from_matrix(R)
         print(x_20)
 

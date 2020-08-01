@@ -26,6 +26,10 @@ class MoveItServer(object):
         self._srv_get_pose = rospy.Service('get_group_pose', GetGroupPose, self.get_pose_handle)
         self._srv_get_js = rospy.Service('get_group_joint_states', GetGroupJointStates, self.get_js_handle)
 
+        self._srv_group_position = rospy.Service(
+            'execute_group_position', ExecuteGroupPosition, self.group_position_handle
+        )
+        self._srv_group_shift = rospy.Service('execute_group_shift', ExecuteGroupShift, self.group_shift_handle)
         self._srv_group_pose = rospy.Service('execute_group_pose', ExecuteGroupPose, self.group_pose_handle)
         self._srv_group_js = rospy.Service('execute_group_joint_states', ExecuteGroupJointStates, self.group_js_handle)
         self._srv_group_home = rospy.Service('execute_group_home', ExecuteGroupJointStates, self.group_home_handle)
@@ -74,6 +78,23 @@ class MoveItServer(object):
             resp.result_status = resp.SUCCEEDED
         except IndexError:
             resp.result_status = resp.FAILED
+        return resp
+
+    def group_shift_handle(self, req):
+        ok = self.interface.group_shift(req.group_name, req.axis, req.goal)
+        resp = ExecuteGroupShiftResponse()
+        resp.result_status = resp.SUCCEEDED if ok else resp.FAILED
+        return resp
+
+    def group_position_handle(self, req):
+        if not req.tolerance:
+            req.tolerance = 0.01
+        if req.is_absolute:
+            ok = self.interface.group_go_to_absolute_position_goal(req.group_name, req.goal, req.tolerance)
+        else:
+            ok = self.interface.group_go_to_relative_position_goal(req.group_name, req.goal, req.tolerance)
+        resp = ExecuteGroupPositionResponse()
+        resp.result_status = resp.SUCCEEDED if ok else resp.FAILED
         return resp
 
     def group_pose_handle(self, req):
