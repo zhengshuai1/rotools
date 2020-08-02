@@ -32,11 +32,17 @@ class MoveItServer(object):
         self._srv_group_shift = rospy.Service('execute_group_shift', ExecuteGroupShift, self.group_shift_handle)
         self._srv_group_pose = rospy.Service('execute_group_pose', ExecuteGroupPose, self.group_pose_handle)
         self._srv_group_js = rospy.Service('execute_group_joint_states', ExecuteGroupJointStates, self.group_js_handle)
-        self._srv_group_home = rospy.Service('execute_group_home', ExecuteGroupJointStates, self.group_home_handle)
+        self._srv_group_home = rospy.Service(
+            'execute_group_named_states', ExecuteGroupNamedStates, self.group_named_states_handle
+        )
         self._srv_group_plan = rospy.Service('execute_group_plan', ExecuteGroupPlan, self.group_plan_handle)
 
         self._srv_al_poses = rospy.Service('execute_all_poses', ExecuteAllPoses, self.all_poses_handle)
         self._srv_all_plans = rospy.Service('execute_all_plans', ExecuteAllPlans, self.all_plans_handle)
+
+        self._srv_add_box = rospy.Service('execute_add_box', ExecuteAddBox, self.add_box_handle)
+        self._srv_add_plane = rospy.Service('execute_add_plane', ExecuteAddPlane, self.add_plane_handle)
+        self._srv_remove_box = rospy.Service('execute_remove_box', ExecuteRemoveObject, self.remove_object_handle)
 
     def get_all_names_handle(self, req):
         resp = GetAllNamesResponse()
@@ -116,12 +122,8 @@ class MoveItServer(object):
         resp.result_status = resp.SUCCEEDED if ok else resp.FAILED
         return resp
 
-    def group_home_handle(self, req):
-        if not req.tolerance:
-            req.tolerance = 0.01
-
-        goal = [0.] * len(self.interface.get_active_joint_names_of_group(req.group_name))
-        ok = self.interface.group_go_to_joint_states(req.group_name, goal, req.tolerance)
+    def group_named_states_handle(self, req):
+        ok = self.interface.group_go_to_named_states(req.group_name, req.state_name)
         resp = ExecuteGroupJointStatesResponse()
         resp.result_status = resp.SUCCEEDED if ok else resp.FAILED
         return resp
@@ -156,5 +158,24 @@ class MoveItServer(object):
             all_plans = self.interface.build_relative_paths_for_all(req.all_poses, req.stamps, not req.allow_collision)
         ok = self.interface.execute_plans_for_all(all_plans)
         resp = ExecuteAllPlansResponse()
+        resp.result_status = resp.SUCCEEDED if ok else resp.FAILED
+        return resp
+
+    def add_box_handle(self, req):
+        ok = self.interface.add_box(req.group_name, req.box_name, req.box_pose,
+                                    req.box_size, req.is_absolute, req.auto_subfix)
+        resp = ExecuteAddBoxResponse()
+        resp.result_status = resp.SUCCEEDED if ok else resp.FAILED
+        return resp
+
+    def add_plane_handle(self, req):
+        ok = self.interface.add_plane(req.group_name, req.plane_name, req.plane_pose, req.plane_normal)
+        resp = ExecuteAddPlaneResponse()
+        resp.result_status = resp.SUCCEEDED if ok else resp.FAILED
+        return resp
+
+    def remove_object_handle(self, req):
+        ok = self.interface.remove_object(req.obj_name, req.is_exact)
+        resp = ExecuteRemoveObjectResponse()
         resp.result_status = resp.SUCCEEDED if ok else resp.FAILED
         return resp

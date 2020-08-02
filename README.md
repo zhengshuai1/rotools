@@ -26,9 +26,9 @@ Refer README in each submodule for a detailed guide.
 Interfaces for RoTools to interact with 3rd-party software like the MoveIt! 
 motion planing package and simulators such as Webots and CoppeliaSim.
 
-### moveit
+### [moveit](rotools/moveit/README.md)
 
-Interfaces for RoTools to interact with the MoveIt! motion planing package.
+Interfaces and server for RoTools to interact with the MoveIt! motion planing package.
 
 ### policy
 

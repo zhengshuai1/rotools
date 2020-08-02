@@ -16,7 +16,7 @@ try:
 except ImportError:
     pass
 
-from rotools.utility import common
+from rotools.utility import common, transform
 
 
 class MoveGroupInterface(object):
@@ -33,7 +33,6 @@ class MoveGroupInterface(object):
 
         moveit_commander.roscpp_initialize(sys.argv)
         self.commander = moveit_commander.RobotCommander(robot_description, ns)
-        # self.scene = moveit_commander.PlanningSceneInterface(ns=ns)
 
         if not isinstance(group_names, list) and not isinstance(group_names, tuple):
             raise TypeError('group_names should be list or tuple, but got {}'.format(type(group_names)))
@@ -70,6 +69,9 @@ class MoveGroupInterface(object):
             self.ee_links = ee_links
             for i, group in enumerate(self.move_groups):
                 group.set_end_effector_link(self.ee_links[i])
+
+        self.scene = moveit_commander.PlanningSceneInterface(ns=ns)
+        self._obj_subfix = 0
 
         # Sometimes for debugging it is useful to print the entire state of the robot:
         print(self.commander.get_current_state())
@@ -150,13 +152,31 @@ class MoveGroupInterface(object):
         :param tolerance: float
         :return: bool
         """
-        group_id = self._get_group_id(group_name)
-        assert group_id is not None
-        group = self.move_groups[group_id]
+        group = self._get_group_by_name(group_name)
         group.go(goal, wait=True)
         group.stop()
         current_joints = group.get_current_joint_values()
         return common.all_close(goal, current_joints, tolerance)
+
+    @staticmethod
+    def _group_go_to_predefined_target(group):
+        try:
+            group.go(wait=True)
+            group.stop()
+            group.clear_pose_targets()
+            return True
+        except moveit_commander.MoveItCommanderException:
+            group.stop()
+            group.clear_pose_targets()
+            return False
+
+    def group_go_to_named_states(self, group_name, state_name):
+        group = self._get_group_by_name(group_name)
+        try:
+            group.set_named_target(state_name)
+            return self._group_go_to_predefined_target(group)
+        except moveit_commander.MoveItCommanderException:
+            return False
 
     def all_go_to_joint_states(self, goals):
         assert len(goals) == self.group_num
@@ -267,23 +287,24 @@ class MoveGroupInterface(object):
         group.clear_pose_targets()
 
         current_position = self.get_current_position_of_group(group_name)
+        # Standardize input before using all_close
+        goal = common.sd_position(goal)
+        current_position = common.sd_position(current_position)
         return common.all_close(goal, current_position, tolerance)
 
-    def _to_absolute_position(self, group_name, relative_position, init_position=None):
+    def _to_absolute_position(self, group_name, relative_position):
         """Convert a relative position in eef frame to base frame.
 
         :param group_name: str Planning group name
-        :param relative_position: Pose or List[float]
-        :param init_position: Initial position of the robot before moving relatively
-        :return: Pose
+        :param relative_position: Point or List[float]
+        :return: ndarray
         """
-        if not init_position:
-            current_position = self.get_current_position_of_group(group_name)
-        else:
-            current_position = init_position
-        current_position = common.sd_position(current_position)
-        relative_position = common.sd_position(relative_position)
-        absolute_position = current_position + relative_position
+        current_pose = self.get_current_pose_of_group(group_name)
+        current_pose_mat = common.sd_pose(current_pose)
+        relative_pose_mat = transform.identity_matrix()
+        relative_pose_mat[0:3, 3] = common.sd_position(relative_position)
+        absolute_pose_mat = np.dot(current_pose_mat, relative_pose_mat)  # T_b1 * T_12 = T_b2
+        absolute_position = absolute_pose_mat[0:3, 3]
         return absolute_position
 
     def group_go_to_absolute_position_goal(self, group_name, goal, tolerance=0.001):
@@ -480,4 +501,46 @@ class MoveGroupInterface(object):
             ok = self.execute_plan_for_group(group_name, plan, wait=True)
             if not ok:
                 return False
+        return True
+
+    def add_box(self, group_name, box_name, box_pose, box_size, is_absolute, auto_subfix=False):
+        group = self._get_group_by_name(group_name)
+        box_pose_stamped = GeometryMsg.PoseStamped()
+        box_pose_stamped.pose = box_pose
+        if is_absolute:
+            box_pose_stamped.header.frame_id = group.get_planning_frame()
+        else:
+            box_pose_stamped.header.frame_id = group.get_end_effector_link()
+        if auto_subfix:
+            box_name += str(self._obj_subfix)
+            self._obj_subfix += 1
+
+        assert isinstance(box_size, GeometryMsg.Point)
+        # size must be iterable
+        self.scene.add_box(box_name, box_pose_stamped, size=(box_size.x, box_size.y, box_size.z))
+
+        start = rospy.get_time()
+        seconds = rospy.get_time()
+        while (seconds - start < 3) and not rospy.is_shutdown():
+            if box_name in self.scene.get_known_object_names():
+                return True
+            rospy.sleep(0.1)
+            seconds = rospy.get_time()
+        return False
+
+    def remove_object(self, obj_name, is_exact=False):
+        if is_exact:
+            self.scene.remove_world_object(obj_name)
+        else:
+            for name in self.scene.get_known_object_names():
+                if obj_name in name:
+                    self.scene.remove_world_object(name)
+        return True
+
+    def add_plane(self, group_name, plane_name, plane_pose, plane_normal):
+        group = self._get_group_by_name(group_name)
+        plane_pose_stamped = GeometryMsg.PoseStamped()
+        plane_pose_stamped.pose = plane_pose
+        plane_pose_stamped.header.frame_id = group.get_planning_frame()
+        self.scene.add_plane(plane_name, plane_pose_stamped, normal=(plane_normal.x, plane_normal.y, plane_normal.z))
         return True
