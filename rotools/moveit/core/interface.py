@@ -528,6 +528,21 @@ class MoveGroupInterface(object):
             seconds = rospy.get_time()
         return False
 
+    def attach_box(self, group_name, eef_group_name, box_name, box_pose, box_size):
+        ok = self.add_box(group_name, box_name, box_pose, box_size, is_absolute=True, auto_subfix=False)
+        if not ok:
+            return False
+        group = self._get_group_by_name(group_name)
+        grasping_group = eef_group_name
+        touch_links = self.commander.get_link_names(group=grasping_group)
+        self.scene.attach_box(group.get_end_effector_link(), box_name, touch_links=touch_links)
+        return True
+
+    def detach_object(self, group_name, obj_name):
+        group = self._get_group_by_name(group_name)
+        self.scene.remove_attached_object(group.get_end_effector_link(), name=obj_name)
+        return True
+
     def remove_object(self, obj_name, is_exact=False):
         if is_exact:
             self.scene.remove_world_object(obj_name)

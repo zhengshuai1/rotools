@@ -42,7 +42,9 @@ class MoveItServer(object):
 
         self._srv_add_box = rospy.Service('execute_add_box', ExecuteAddBox, self.add_box_handle)
         self._srv_add_plane = rospy.Service('execute_add_plane', ExecuteAddPlane, self.add_plane_handle)
-        self._srv_remove_box = rospy.Service('execute_remove_box', ExecuteRemoveObject, self.remove_object_handle)
+        self._srv_attach_box = rospy.Service('execute_attach_box', ExecuteAttachBox, self.attach_box_handle)
+        self._srv_detach_obj = rospy.Service('execute_detach_object', ExecuteDetachObject, self.detach_object_handle)
+        self._srv_remove_obj = rospy.Service('execute_remove_object', ExecuteRemoveObject, self.remove_object_handle)
 
     def get_all_names_handle(self, req):
         resp = GetAllNamesResponse()
@@ -168,9 +170,21 @@ class MoveItServer(object):
         resp.result_status = resp.SUCCEEDED if ok else resp.FAILED
         return resp
 
+    def attach_box_handle(self, req):
+        ok = self.interface.attach_box(req.group_name, req.eef_group_name, req.box_name, req.box_pose, req.box_size)
+        resp = ExecuteAttachBoxResponse()
+        resp.result_status = resp.SUCCEEDED if ok else resp.FAILED
+        return resp
+
     def add_plane_handle(self, req):
         ok = self.interface.add_plane(req.group_name, req.plane_name, req.plane_pose, req.plane_normal)
         resp = ExecuteAddPlaneResponse()
+        resp.result_status = resp.SUCCEEDED if ok else resp.FAILED
+        return resp
+
+    def detach_object_handle(self, req):
+        ok = self.interface.detach_object(req.group_name, req.obj_name)
+        resp = ExecuteDetachObjectResponse()
         resp.result_status = resp.SUCCEEDED if ok else resp.FAILED
         return resp
 
