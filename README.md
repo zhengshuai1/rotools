@@ -9,11 +9,12 @@ Author: Zhipeng Dong
 
 ## Install
 
-Put the root folder of this repo in `ROTOOLS_ROOT` dir.
+Put the root folder of this repo in `ROTOOLS_ROOT` dir, here `ROTOOLS_ROOT` represents
+the actual path of RoTools root folder, like `/home/dzp/rotools`
 
 Add `export PYTHONPATH=${PYTHONPATH}:ROTOOLS_ROOT` into the bashrc file.
 
-You may need to `source ~/.bashrc` for new terminal.
+You may need to `source ~/.bashrc` for new terminals.
 
 
 ## Submodules
