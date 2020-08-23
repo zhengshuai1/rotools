@@ -4,10 +4,9 @@
 from __future__ import print_function
 
 import unittest
+import tf.transformations
 import math
 import numpy as np
-
-import geometry_msgs.msg as GeometryMsg
 
 import rotools.utility.transform as transform
 
@@ -71,6 +70,25 @@ class Test(unittest.TestCase):
 
         Q2 = transform.quaternion_matrix([0.0, 0.0, 0.0573195181787, 0.998355925083])
         print(transform.euler_from_matrix(Q2))
+
+    def test_quaternion_multiply(self):
+        """This example shows the usage of quaternion_multiply.
+
+        Given transforms Tb1 and Tbs, Ts1 is calculated by Ts1 = T1s.T = (Tb1.t * Tbs).T
+        Notice that here '*' must be implemented with np.dot, and for rotation matrix,
+        T.T == T^-1
+        """
+        Tb1 = transform.rotation_matrix(45 * np.pi / 180., (0, 0, 1))
+        Tbs = transform.rotation_matrix(90 * np.pi / 180., (0, 1, 0))
+        T1s = np.dot(np.transpose(Tb1), Tbs)
+        Ts1 = np.transpose(T1s)
+
+        q_b1 = transform.quaternion_from_matrix(Tb1)
+        q_bs = transform.quaternion_from_matrix(Tbs)
+        q_s1 = transform.quaternion_from_matrix(Ts1)
+        q_m = tf.transformations.quaternion_multiply(q_bs, q_s1)
+        for i in range(4):
+            self.assertAlmostEqual(q_b1[i], q_m[i])
 
     def test_2d_rotation(self):
         R = transform.rotation_matrix(-20 * np.pi / 180, (0, 0, 1))
