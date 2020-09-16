@@ -23,7 +23,6 @@ def all_close(goal, actual, tolerance):
     """
     if type(goal) is list or type(goal) is tuple:
         if not np.allclose(goal, actual, atol=tolerance):
-            print('Goal not reached!')
             return False
     elif isinstance(goal, np.ndarray) and isinstance(actual, np.ndarray):
         return all_close(list(goal), list(actual), tolerance)
@@ -33,8 +32,6 @@ def all_close(goal, actual, tolerance):
         return all_close(pose_to_list(goal), pose_to_list(actual), tolerance)
     else:
         raise NotImplementedError('Goal type is {} while actual pose type is {}'.format(type(goal), type(actual)))
-
-    print('Goal reached')
     return True
 
 

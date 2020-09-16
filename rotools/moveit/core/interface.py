@@ -71,7 +71,7 @@ class MoveGroupInterface(object):
                 group.set_end_effector_link(self.ee_links[i])
 
         self.scene = moveit_commander.PlanningSceneInterface(ns=ns)
-        self._obj_subfix = 0
+        self._obj_suffix = 0
 
         # Sometimes for debugging it is useful to print the entire state of the robot:
         print(self.commander.get_current_state())
@@ -93,6 +93,35 @@ class MoveGroupInterface(object):
             if name == group_name:
                 return self.move_groups[i]
         raise IndexError
+    
+    def _wait_js_goal_execution(self, group_name, js_goal, tol):
+        js_temp = self.get_joint_states_of_group(group_name)
+        cnt = 30
+        while not rospy.is_shutdown() and cnt:
+            rospy.sleep(0.1)
+            js_curr = self.get_joint_states_of_group(group_name)
+            if common.all_close(js_goal, js_curr, tol):
+                return True
+            if common.all_close(js_curr, js_temp, 0.001):
+                cnt -= 1
+            else:
+                js_temp = js_curr
+        return False
+    
+    def _wait_pose_goal_execution(self, group_name, pose_goal, tol):
+        group = self._get_group_by_name(group_name)
+        pose_temp = common.regularize_pose(group.get_current_pose().pose)
+        cnt = 30
+        while not rospy.is_shutdown() and cnt:
+            rospy.sleep(0.1)
+            pose_curr = common.regularize_pose(group.get_current_pose().pose)
+            if common.all_close(pose_goal, pose_curr, tol):
+                return True
+            if common.all_close(pose_curr, pose_temp, 0.001):
+                cnt -= 1
+            else:
+                pose_temp = pose_curr
+        return False
 
     def get_active_joint_names_of_all_groups(self):
         ret = []
@@ -155,8 +184,7 @@ class MoveGroupInterface(object):
         group = self._get_group_by_name(group_name)
         group.go(goal, wait=True)
         group.stop()
-        current_joints = group.get_current_joint_values()
-        return common.all_close(goal, current_joints, tolerance)
+        return self._wait_js_goal_execution(group_name, goal, tolerance)
 
     @staticmethod
     def _group_go_to_predefined_target(group):
@@ -207,9 +235,7 @@ class MoveGroupInterface(object):
 
         group.stop()
         group.clear_pose_targets()
-
-        current_pose = common.regularize_pose(group.get_current_pose().pose)
-        return common.all_close(goal, current_pose, tolerance)
+        return self._wait_pose_goal_execution(group_name, goal, tolerance)
 
     def _to_absolute_pose(self, group_name, relative_pose, init_pose=None):
         """Convert a relative pose in eef frame to base frame.
@@ -242,7 +268,6 @@ class MoveGroupInterface(object):
             goal_pose = goal
         else:
             raise NotImplementedError('Goal of type {} is not defined'.format(type(goal)))
-
         return self._group_go_to_pose_goal(group_name, goal_pose, tolerance)
 
     def group_go_to_relative_pose_goal(self, group_name, goal, tolerance=0.01):
@@ -320,8 +345,8 @@ class MoveGroupInterface(object):
         """Move the group along given axis and shift goal
 
         :param group_name:
-        :param axis: Could be x y z r p y
-        :param goal: float
+        :param axis: str Axis id, could be x y z r p y
+        :param goal: float Goal value of given axis
         :return:
         """
         group = self._get_group_by_name(group_name)
@@ -512,8 +537,8 @@ class MoveGroupInterface(object):
         else:
             box_pose_stamped.header.frame_id = group.get_end_effector_link()
         if auto_subfix:
-            box_name += str(self._obj_subfix)
-            self._obj_subfix += 1
+            box_name += str(self._obj_suffix)
+            self._obj_suffix += 1
 
         assert isinstance(box_size, GeometryMsg.Point)
         # size must be iterable
