@@ -23,10 +23,10 @@ class Test(unittest.TestCase):
         90 * np.pi / 180, (0, 1, 0)  [0.         0.70710678 0.         0.70710678]
         -90 * np.pi / 180, (0, 1, 0)  [0.         -0.70710678 0.         0.70710678]
         """
-        R = transform.rotation_matrix(-180 * np.pi / 180, (1, 0, 0))
+        R = transform.rotation_matrix(180 * np.pi / 180, (1, 0, 0))
         # print(np.array2string(R, separator=', '))
         x_20 = transform.quaternion_from_matrix(R)
-        print(x_20)
+        print("180->x", x_20)
 
         R = transform.euler_matrix(180 * np.pi / 180., 0, 90 * np.pi / 180.)
         x_20 = transform.quaternion_from_matrix(R)
@@ -70,6 +70,23 @@ class Test(unittest.TestCase):
 
         Q2 = transform.quaternion_matrix([0.0, 0.0, 0.0573195181787, 0.998355925083])
         print(transform.euler_from_matrix(Q2))
+
+        M1 = np.array([
+            [-0.999991, -0.000264507, 0.00424902, 1306.64],
+            [- 0.000468398, 0.998844, - 0.0480734, 134.082],
+            [- 0.00423134, - 0.0480748, - 0.998835, 1809.2],
+            [0, 0, 0, 1]
+        ], dtype=float)
+        q = transform.quaternion_from_matrix(M1)
+        print('shenzhen', q)
+
+        Q = transform.euler_from_quaternion([0, 0, -1, 0])
+        M = transform.quaternion_matrix([0, 0, 1, 0])
+        print("ssss", M)
+
+        M = transform.quaternion_matrix([1, 0, 0, 0])
+        print(M)
+
 
     def test_quaternion_multiply(self):
         """This example shows the usage of quaternion_multiply.

@@ -89,6 +89,14 @@ def sd_pose(pose):
         p = pose.position
         o = pose.orientation
         return sd_pose(np.array([p.x, p.y, p.z, o.x, o.y, o.z, o.w]))
+    elif isinstance(pose, GeometryMsg.Transform):
+        p = pose.transform.translation
+        o = pose.transform.rotation
+        return sd_pose(np.array([p.x, p.y, p.z, o.x, o.y, o.z, o.w]))
+    elif isinstance(pose, GeometryMsg.TransformStamped):
+        p = pose.transform.translation
+        o = pose.transform.rotation
+        return sd_pose(np.array([p.x, p.y, p.z, o.x, o.y, o.z, o.w]))
     elif isinstance(pose, GeometryMsg.PoseStamped):
         p = pose.pose.position
         o = pose.pose.orientation

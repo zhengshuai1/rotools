@@ -227,8 +227,9 @@ class MoveGroupInterface(object):
         group = self._get_group_by_name(group_name)
         group.set_pose_target(goal)
         try:
-            group.go(wait=True)
-        except self.commander.MoveItCommanderException:
+            plan = group.plan(goal)
+            group.execute(plan, wait=True)
+        except moveit_commander.MoveItCommanderException:
             group.stop()
             group.clear_pose_targets()
             return False
@@ -303,7 +304,7 @@ class MoveGroupInterface(object):
         group.set_position_target(goal)
         try:
             group.go(wait=True)
-        except self.commander.MoveItCommanderException:
+        except moveit_commander.MoveItCommanderException:
             group.stop()
             group.clear_pose_targets()
             return False
@@ -365,7 +366,7 @@ class MoveGroupInterface(object):
 
         try:
             group.go(wait=True)
-        except self.commander.MoveItCommanderException:
+        except moveit_commander.MoveItCommanderException:
             group.stop()
             group.clear_pose_targets()
             return False

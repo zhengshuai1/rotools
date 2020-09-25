@@ -184,7 +184,7 @@ def walker_left_arm_poe():
 
 
 def franka_panda():
-    """MDH parameters in alpha, a, theta, d order, with units be meter or radius
+    """MDH parameters in alpha, a, theta, d order, with units be meter or radians
 
     note:
     alpha is z axis rotation around x axis
@@ -203,5 +203,14 @@ def franka_panda():
             [-np.pi / 2, -0.0825, 0, 0.384],  # theta in [-2.8973 2.8973] 4 -> 5
             [np.pi / 2, 0, 0, 0],  # theta in [-0.0175 3.7525] 5 -> 6
             [np.pi / 2, 0.088, 0, 0.107],  # theta in [-2.8973 2.8973], 0.107 is distance between link 6 and 8
+        ]
+    )
+
+
+def mz25_mdh_model():
+    return np.array(
+        [
+            [0, 0, 0, ],
+            []
         ]
     )
