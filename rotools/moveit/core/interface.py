@@ -50,6 +50,10 @@ class MoveGroupInterface(object):
         for name in self.group_names:
             self.move_groups.append(moveit_commander.MoveGroupCommander(name))
 
+        for group in self.move_groups:
+            group.allow_looking(True)
+            group.allow_replanning(True)
+
         if not ref_frames:
             self.ref_frames = []
             for group in self.move_groups:
@@ -227,6 +231,8 @@ class MoveGroupInterface(object):
         group = self._get_group_by_name(group_name)
         group.set_pose_target(goal)
         try:
+            constraints = self.get_group_path_constraints(group_name, group.get_current_pose().pose)
+            group.set_path_constraints(constraints)
             plan = group.plan(goal)
             group.execute(plan, wait=True)
         except moveit_commander.MoveItCommanderException:
@@ -585,3 +591,38 @@ class MoveGroupInterface(object):
         plane_pose_stamped.header.frame_id = group.get_planning_frame()
         self.scene.add_plane(plane_name, plane_pose_stamped, normal=(plane_normal.x, plane_normal.y, plane_normal.z))
         return True
+
+    def get_group_path_constraints(self, group_name, ref_pose):
+        """
+
+        :return:
+        """
+        g_id = self._get_group_id(group_name)
+        constraints = MoveItMsg.Constraints()
+
+        oc = MoveItMsg.OrientationConstraint()
+        oc.orientation.x = ref_pose.orientation.x
+        oc.orientation.y = ref_pose.orientation.y
+        oc.orientation.z = ref_pose.orientation.z
+        oc.orientation.w = ref_pose.orientation.w
+        oc.absolute_x_axis_tolerance = -1.57
+        oc.absolute_y_axis_tolerance = -1.57
+        oc.absolute_z_axis_tolerance = 3.14
+        oc.weight = 1.0
+        oc.link_name = self.ee_links[g_id]
+        oc.header.frame_id = self.ref_frames[g_id]
+        oc.header.stamp = rospy.Time.now()
+        constraints.orientation_constraints.append(oc)
+
+        """
+        jcm = moveit_msgs.msg.JointConstraint()
+        jcm.joint_name = "right_j1"
+        jcm.position = 0
+        jcm.tolerance_above = 0.5
+        jcm.tolerance_below = 0.5
+        jcm.weight = 0.5
+        constraints.joint_constraints.append(jcm)
+        rospy.sleep(0.1)
+        """
+
+        return constraints
