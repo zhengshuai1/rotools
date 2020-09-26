@@ -1,6 +1,7 @@
 from __future__ import print_function
 
 import sys
+import math
 import numpy as np
 
 try:
@@ -50,9 +51,9 @@ class MoveGroupInterface(object):
         for name in self.group_names:
             self.move_groups.append(moveit_commander.MoveGroupCommander(name))
 
-        for group in self.move_groups:
-            group.allow_looking(True)
-            group.allow_replanning(True)
+        # for group in self.move_groups:
+        #     group.allow_looking(True)
+        #     group.allow_replanning(True)
 
         if not ref_frames:
             self.ref_frames = []
@@ -186,6 +187,7 @@ class MoveGroupInterface(object):
         :return: bool
         """
         group = self._get_group_by_name(group_name)
+        group.clear_path_constraints()
         group.go(goal, wait=True)
         group.stop()
         return self._wait_js_goal_execution(group_name, goal, tolerance)
@@ -231,6 +233,7 @@ class MoveGroupInterface(object):
         group = self._get_group_by_name(group_name)
         group.set_pose_target(goal)
         try:
+            group.clear_path_constraints()
             constraints = self.get_group_path_constraints(group_name, group.get_current_pose().pose)
             group.set_path_constraints(constraints)
             plan = group.plan(goal)
@@ -605,9 +608,9 @@ class MoveGroupInterface(object):
         oc.orientation.y = ref_pose.orientation.y
         oc.orientation.z = ref_pose.orientation.z
         oc.orientation.w = ref_pose.orientation.w
-        oc.absolute_x_axis_tolerance = -1.57
-        oc.absolute_y_axis_tolerance = -1.57
-        oc.absolute_z_axis_tolerance = 3.14
+        oc.absolute_x_axis_tolerance = 0.14  # roll
+        oc.absolute_y_axis_tolerance = 0.14  # pitch
+        oc.absolute_z_axis_tolerance = math.pi * 4  # yaw
         oc.weight = 1.0
         oc.link_name = self.ee_links[g_id]
         oc.header.frame_id = self.ref_frames[g_id]
