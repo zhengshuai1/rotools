@@ -187,7 +187,6 @@ class MoveGroupInterface(object):
         :return: bool
         """
         group = self._get_group_by_name(group_name)
-        group.clear_path_constraints()
         group.go(goal, wait=True)
         group.stop()
         return self._wait_js_goal_execution(group_name, goal, tolerance)
@@ -222,29 +221,32 @@ class MoveGroupInterface(object):
             group.stop()
         return True
 
-    def _group_go_to_pose_goal(self, group_name, goal, tolerance=0.01):
+    def _group_go_to_pose_goal(self, group_name, goal, tolerance=0.01, constraint=''):
         """Set the pose of the tcp of a group as goal.
 
         :param group_name:
         :param goal:
         :param tolerance:
+        :param constraint: str, path constraint. 'rpy' for no rotation, 'rp' for only yaw
         :return:
         """
         group = self._get_group_by_name(group_name)
         group.set_pose_target(goal)
         try:
-            group.clear_path_constraints()
-            constraints = self.get_group_path_constraints(group_name, group.get_current_pose().pose)
-            group.set_path_constraints(constraints)
+            ok, constraints = self.get_group_path_constraints(group_name, group.get_current_pose().pose, constraint)
+            if ok:
+                group.set_path_constraints(constraints)
             plan = group.plan(goal)
             group.execute(plan, wait=True)
         except moveit_commander.MoveItCommanderException:
             group.stop()
             group.clear_pose_targets()
+            group.clear_path_constraints()
             return False
 
         group.stop()
         group.clear_pose_targets()
+        group.clear_path_constraints()
         return self._wait_pose_goal_execution(group_name, goal, tolerance)
 
     def _to_absolute_pose(self, group_name, relative_pose, init_pose=None):
@@ -264,12 +266,13 @@ class MoveGroupInterface(object):
         absolute_pose_mat = np.dot(current_pose_mat, relative_pose_mat)  # T_b1 * T_12 = T_b2
         return common.to_ros_pose(absolute_pose_mat)
 
-    def group_go_to_absolute_pose_goal(self, group_name, goal, tolerance=0.01):
+    def group_go_to_absolute_pose_goal(self, group_name, goal, tolerance=0.01, constraint=''):
         """Move group to the goal pose wrt the base frame
 
         :param group_name: Controlled group name
         :param goal: geometry_msgs.msg.Pose or PoseStamped
         :param tolerance:
+        :param constraint: str, path constraint. 'rpy' for no rotation, 'rp' for only yaw
         :return: whether goal reached
         """
         if isinstance(goal, GeometryMsg.PoseStamped):
@@ -278,7 +281,7 @@ class MoveGroupInterface(object):
             goal_pose = goal
         else:
             raise NotImplementedError('Goal of type {} is not defined'.format(type(goal)))
-        return self._group_go_to_pose_goal(group_name, goal_pose, tolerance)
+        return self._group_go_to_pose_goal(group_name, goal_pose, tolerance, constraint)
 
     def group_go_to_relative_pose_goal(self, group_name, goal, tolerance=0.01):
         """Move group to the goal pose wrt the eef frame
@@ -595,7 +598,7 @@ class MoveGroupInterface(object):
         self.scene.add_plane(plane_name, plane_pose_stamped, normal=(plane_normal.x, plane_normal.y, plane_normal.z))
         return True
 
-    def get_group_path_constraints(self, group_name, ref_pose):
+    def get_group_path_constraints(self, group_name, ref_pose, constraint=''):
         """
 
         :return:
@@ -608,12 +611,19 @@ class MoveGroupInterface(object):
         oc.orientation.y = ref_pose.orientation.y
         oc.orientation.z = ref_pose.orientation.z
         oc.orientation.w = ref_pose.orientation.w
-        oc.absolute_x_axis_tolerance = 0.14  # roll
-        oc.absolute_y_axis_tolerance = 0.14  # pitch
-        oc.absolute_z_axis_tolerance = math.pi * 4  # yaw
+        if constraint == 'rpy':
+            oc.absolute_x_axis_tolerance = 0.2  # roll
+            oc.absolute_y_axis_tolerance = 0.2  # pitch
+            oc.absolute_z_axis_tolerance = 0.2  # yaw
+        elif constraint == 'rp':
+            oc.absolute_x_axis_tolerance = 0.2  # roll
+            oc.absolute_y_axis_tolerance = 0.2  # pitch
+            oc.absolute_z_axis_tolerance = math.pi * 4  # yaw
+        else:
+            return False, None
         oc.weight = 1.0
         oc.link_name = self.ee_links[g_id]
-        oc.header.frame_id = self.ref_frames[g_id]
+        oc.header.frame_id = self.ee_links[g_id]
         oc.header.stamp = rospy.Time.now()
         constraints.orientation_constraints.append(oc)
 
@@ -628,4 +638,4 @@ class MoveGroupInterface(object):
         rospy.sleep(0.1)
         """
 
-        return constraints
+        return True, constraints
