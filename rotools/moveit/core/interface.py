@@ -227,18 +227,17 @@ class MoveGroupInterface(object):
         :param group_name:
         :param goal:
         :param tolerance:
-        :param constraint: str, path constraint. 'rpy' for no rotation, 'rp' for only yaw
+        :param constraint:
         :return:
         """
         group = self._get_group_by_name(group_name)
         group.set_pose_target(goal)
         try:
-            ok, constraints = self.get_group_path_constraints(group_name, group.get_current_pose().pose, constraint)
+            ok, constraints = self.get_group_orientation_constraints(group_name, constraint)
             if ok:
                 group.set_path_constraints(constraints)
-            plan = group.plan(goal)
-            group.execute(plan, wait=True)
-        except moveit_commander.MoveItCommanderException:
+            group.go(wait=True)
+        except self.commander.MoveItCommanderException:
             group.stop()
             group.clear_pose_targets()
             group.clear_path_constraints()
@@ -249,8 +248,27 @@ class MoveGroupInterface(object):
         group.clear_path_constraints()
         return self._wait_pose_goal_execution(group_name, goal, tolerance)
 
-    def _to_absolute_pose(self, group_name, relative_pose, init_pose=None):
-        """Convert a relative pose in eef frame to base frame.
+    def _local_base_to_global_pose(self, group_name, relative_pose, init_pose=None):
+        """Convert a relative pose in local base frame to global base frame.
+
+        :param group_name: str Planning group name
+        :param relative_pose: Pose or List[float]
+        :param init_pose: Initial pose of the robot before moving relatively
+        :return: Pose
+        """
+        if not init_pose:
+            current_pose = self.get_current_pose_of_group(group_name)
+        else:
+            current_pose = init_pose
+        current_pose_mat = common.sd_pose(current_pose)  # T_be
+        local_base_mat = transform.identity_matrix()
+        local_base_mat[0:3, 3] = current_pose_mat[0:3, 3]  # T_bb'
+        relative_pose_mat = common.sd_pose(relative_pose)  # T_b'e'
+        absolute_pose_mat = np.dot(local_base_mat, relative_pose_mat)  # T_bb' * T_b'e' = T_be'
+        return common.to_ros_pose(absolute_pose_mat)
+
+    def _eef_pose_to_global_pose(self, group_name, relative_pose, init_pose=None):
+        """Convert a relative pose in eef frame to global base frame.
 
         :param group_name: str Planning group name
         :param relative_pose: Pose or List[float]
@@ -266,13 +284,13 @@ class MoveGroupInterface(object):
         absolute_pose_mat = np.dot(current_pose_mat, relative_pose_mat)  # T_b1 * T_12 = T_b2
         return common.to_ros_pose(absolute_pose_mat)
 
-    def group_go_to_absolute_pose_goal(self, group_name, goal, tolerance=0.01, constraint=''):
-        """Move group to the goal pose wrt the base frame
+    def group_go_to_global_base_goal(self, group_name, goal, tolerance=0.01, constraint=''):
+        """Move group to the goal pose wrt the global base frame
 
         :param group_name: Controlled group name
         :param goal: geometry_msgs.msg.Pose or PoseStamped
         :param tolerance:
-        :param constraint: str, path constraint. 'rpy' for no rotation, 'rp' for only yaw
+        :param constraint: str, path constraint.
         :return: whether goal reached
         """
         if isinstance(goal, GeometryMsg.PoseStamped):
@@ -281,14 +299,35 @@ class MoveGroupInterface(object):
             goal_pose = goal
         else:
             raise NotImplementedError('Goal of type {} is not defined'.format(type(goal)))
+
         return self._group_go_to_pose_goal(group_name, goal_pose, tolerance, constraint)
 
-    def group_go_to_relative_pose_goal(self, group_name, goal, tolerance=0.01):
+    def group_go_to_local_base_goal(self, group_name, goal, tolerance=0.01, constraint=''):
+        """Move group to the goal pose wrt the local base frame
+
+        :param group_name: Controlled group name
+        :param goal: geometry_msgs.msg.Pose or PoseStamped
+        :param tolerance:
+        :param constraint: str, path constraint.
+        :return: whether goal reached
+        """
+        if isinstance(goal, GeometryMsg.PoseStamped):
+            goal_pose = goal.pose
+        elif isinstance(goal, GeometryMsg.Pose):
+            goal_pose = goal
+        else:
+            raise NotImplementedError('Goal of type {} is not defined'.format(type(goal)))
+
+        abs_goal = self._local_base_to_global_pose(group_name, goal_pose)
+        return self._group_go_to_pose_goal(group_name, abs_goal, tolerance, constraint)
+
+    def group_go_to_eef_goal(self, group_name, goal, tolerance=0.01, constraint=''):
         """Move group to the goal pose wrt the eef frame
 
         :param group_name:
         :param goal:
         :param tolerance:
+        :param constraint: str, path constraint.
         :return:
         """
         if isinstance(goal, GeometryMsg.PoseStamped):
@@ -298,8 +337,8 @@ class MoveGroupInterface(object):
         else:
             raise NotImplementedError
 
-        abs_goal = self._to_absolute_pose(group_name, goal_pose)
-        return self._group_go_to_pose_goal(group_name, abs_goal, tolerance)
+        abs_goal = self._eef_pose_to_global_pose(group_name, goal_pose)
+        return self._group_go_to_pose_goal(group_name, abs_goal, tolerance, constraint)
 
     def _group_go_to_position_goal(self, group_name, goal, tolerance=0.01):
         """Set the position of the tcp of a group as goal.
@@ -598,12 +637,17 @@ class MoveGroupInterface(object):
         self.scene.add_plane(plane_name, plane_pose_stamped, normal=(plane_normal.x, plane_normal.y, plane_normal.z))
         return True
 
-    def get_group_path_constraints(self, group_name, ref_pose, constraint=''):
+    def get_group_orientation_constraints(self, group_name, constraint=''):
         """
 
         :return:
         """
+        if not constraint:
+            return False, None
+
         g_id = self._get_group_id(group_name)
+        group = self._get_group_by_name(group_name)
+        ref_pose = group.get_current_pose().pose
         constraints = MoveItMsg.Constraints()
 
         oc = MoveItMsg.OrientationConstraint()
@@ -611,31 +655,26 @@ class MoveGroupInterface(object):
         oc.orientation.y = ref_pose.orientation.y
         oc.orientation.z = ref_pose.orientation.z
         oc.orientation.w = ref_pose.orientation.w
-        if constraint == 'rpy':
-            oc.absolute_x_axis_tolerance = 0.2  # roll
-            oc.absolute_y_axis_tolerance = 0.2  # pitch
-            oc.absolute_z_axis_tolerance = 0.2  # yaw
-        elif constraint == 'rp':
-            oc.absolute_x_axis_tolerance = 0.2  # roll
-            oc.absolute_y_axis_tolerance = 0.2  # pitch
-            oc.absolute_z_axis_tolerance = math.pi * 4  # yaw
+
+        if 'r' in constraint:
+            oc.absolute_x_axis_tolerance = math.pi  # roll
         else:
-            return False, None
+            oc.absolute_x_axis_tolerance = math.pi * 4
+
+        if 'p' in constraint:
+            oc.absolute_y_axis_tolerance = math.pi  # pitch
+        else:
+            oc.absolute_y_axis_tolerance = math.pi * 4
+
+        if 'y' in constraint:
+            oc.absolute_z_axis_tolerance = math.pi  # yaw
+        else:
+            oc.absolute_z_axis_tolerance = math.pi * 4
+
         oc.weight = 1.0
         oc.link_name = self.ee_links[g_id]
-        oc.header.frame_id = self.ee_links[g_id]
+        oc.header.frame_id = self.ref_frames[g_id]
         oc.header.stamp = rospy.Time.now()
         constraints.orientation_constraints.append(oc)
-
-        """
-        jcm = moveit_msgs.msg.JointConstraint()
-        jcm.joint_name = "right_j1"
-        jcm.position = 0
-        jcm.tolerance_above = 0.5
-        jcm.tolerance_below = 0.5
-        jcm.weight = 0.5
-        constraints.joint_constraints.append(jcm)
-        rospy.sleep(0.1)
-        """
 
         return True, constraints

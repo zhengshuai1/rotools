@@ -108,10 +108,16 @@ class MoveItServer(object):
     def group_pose_handle(self, req):
         if not req.tolerance:
             req.tolerance = 0.01
-        if req.is_absolute:
-            ok = self.interface.group_go_to_absolute_pose_goal(req.group_name, req.goal, req.tolerance)
+
+        if req.goal_type == req.GLOBAL_BASE:
+            ok = self.interface.group_go_to_global_base_goal(req.group_name, req.goal, req.tolerance, req.constraint)
+        elif req.goal_type == req.LOCAL_BASE:
+            ok = self.interface.group_go_to_local_base_goal(req.group_name, req.goal, req.tolerance, req.constraint)
+        elif req.goal_type == req.EEF:
+            ok = self.interface.group_go_to_eef_goal(req.group_name, req.goal, req.tolerance, req.constraint)
         else:
-            ok = self.interface.group_go_to_relative_pose_goal(req.group_name, req.goal, req.tolerance)
+            rospy.logerr('Unknown goal type for group pose: {}'.format(req.goal_type))
+            ok = False
         resp = ExecuteGroupPoseResponse()
         resp.result_status = resp.SUCCEEDED if ok else resp.FAILED
         return resp
