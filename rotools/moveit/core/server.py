@@ -5,6 +5,7 @@ import rospy
 
 from roport.srv import *
 
+
 # make sure setting > export PYTHONPATH="${PYTHONPATH}:~/rotools" in bashrc
 import rotools.moveit.core.interface as interface
 
@@ -45,6 +46,10 @@ class MoveItServer(object):
         self._srv_attach_box = rospy.Service('execute_attach_box', ExecuteAttachBox, self.attach_box_handle)
         self._srv_detach_obj = rospy.Service('execute_detach_object', ExecuteDetachObject, self.detach_object_handle)
         self._srv_remove_obj = rospy.Service('execute_remove_object', ExecuteRemoveObject, self.remove_object_handle)
+
+        self._msg_get_proRunState = rospy.Subscriber('/mz25/measured_programRun_states', std_msgs.msg.Bool, self.programRun_states_cb)
+
+        self.proRunState = True
 
     def get_all_names_handle(self, req):
         resp = GetAllNamesResponse()
@@ -118,6 +123,12 @@ class MoveItServer(object):
         else:
             rospy.logerr('Unknown goal type for group pose: {}'.format(req.goal_type))
             ok = False
+
+        cnt = 300
+        while not rospy.is_shutdown() and self.proRunState:
+            rospy.sleep(0.01)
+            cnt -= 1
+        self.proRunState = True
         resp = ExecuteGroupPoseResponse()
         resp.result_status = resp.SUCCEEDED if ok else resp.FAILED
         return resp
@@ -126,6 +137,11 @@ class MoveItServer(object):
         if not req.tolerance:
             req.tolerance = 0.01
         ok = self.interface.group_go_to_joint_states(req.group_name, req.goal, req.tolerance)
+        cnt = 300
+        while not rospy.is_shutdown() and self.proRunState:
+            rospy.sleep(0.01)
+            cnt -= 1
+        self.proRunState = True
         resp = ExecuteGroupJointStatesResponse()
         resp.result_status = resp.SUCCEEDED if ok else resp.FAILED
         return resp
@@ -199,3 +215,7 @@ class MoveItServer(object):
         resp = ExecuteRemoveObjectResponse()
         resp.result_status = resp.SUCCEEDED if ok else resp.FAILED
         return resp
+
+    def programRun_states_cb(self, msg):
+        rospy.loginfo('I received program state is {}'.format(msg.data))
+        self.proRunState = msg.data
