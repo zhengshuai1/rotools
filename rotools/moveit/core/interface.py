@@ -230,6 +230,8 @@ class MoveGroupInterface(object):
         :param constraint:
         :return:
         """
+        print('excutepose')
+        print(goal)
         group = self._get_group_by_name(group_name)
         group.set_pose_target(goal)
         try:
@@ -467,7 +469,7 @@ class MoveGroupInterface(object):
         #     plan.joint_trajectory.points[i].time_from_start = rospy.Duration.from_sec(t * (i + 1))
         return updated_plan
 
-    def build_absolute_path_for_group(self, group_name, poses, stamp=None, avoid_collisions=True):
+    def build_absolute_path_for_group(self, group_name, poses, stamp=None, avoid_collisions=True, eef_step=0.1):
         """Given way points in a list of geometry_msgs.Pose, plan a path
         go through all way points.
 
@@ -481,11 +483,14 @@ class MoveGroupInterface(object):
         group = self.move_groups[group_id]
         if isinstance(poses, GeometryMsg.PoseArray):
             poses = poses.poses
-        plan, fraction = group.compute_cartesian_path(poses, eef_step=0.01, jump_threshold=0,
+        print('excutemanyposes')
+        print(poses)
+        plan, fraction = group.compute_cartesian_path(poses, eef_step, jump_threshold=0,
                                                       avoid_collisions=avoid_collisions)
         # move_group_interface.h  L754
         if fraction < 0:
-            rospy.logerr('Path planning failed.')
+            rospy.logerr('Path planning failed, fraction is smaller than 0.')
+
         if stamp:
             plan = self._update_plan_time_stamps(group, plan, stamp)
         return plan
