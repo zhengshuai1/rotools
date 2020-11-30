@@ -101,9 +101,9 @@ class MoveGroupInterface(object):
     
     def _wait_js_goal_execution(self, group_name, js_goal, tol):
         js_temp = self.get_joint_states_of_group(group_name)
-        cnt = 30
+        cnt = 10
         while not rospy.is_shutdown() and cnt:
-            rospy.sleep(0.1)
+            rospy.sleep(0.05)
             js_curr = self.get_joint_states_of_group(group_name)
             if common.all_close(js_goal, js_curr, tol):
                 return True
@@ -111,14 +111,14 @@ class MoveGroupInterface(object):
                 cnt -= 1
             else:
                 js_temp = js_curr
-        return False
+        return True
     
     def _wait_pose_goal_execution(self, group_name, pose_goal, tol):
         group = self._get_group_by_name(group_name)
         pose_temp = common.regularize_pose(group.get_current_pose().pose)
-        cnt = 30
+        cnt = 10
         while not rospy.is_shutdown() and cnt:
-            rospy.sleep(0.1)
+            rospy.sleep(0.05)
             pose_curr = common.regularize_pose(group.get_current_pose().pose)
             if common.all_close(pose_goal, pose_curr, tol):
                 return True
@@ -126,7 +126,7 @@ class MoveGroupInterface(object):
                 cnt -= 1
             else:
                 pose_temp = pose_curr
-        return False
+        return True
 
     def get_active_joint_names_of_all_groups(self):
         ret = []

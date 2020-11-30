@@ -132,8 +132,9 @@ class MoveItServer(object):
 
         if req.goal_type == req.GLOBAL_BASE:
             plan = self.interface.build_absolute_path_for_group(req.group_name, req.goals, None, True, req.eef_step)
-            ok = self.interface.execute_plan_for_group(req.group_name, plan)
-               # ok = self.interface._wait_pose_goal_execution(req.group_name, req.goals, req.tolerance)
+            self.interface.execute_plan_for_group(req.group_name, plan)
+            waypoints_number = len(req.goals.poses)
+            ok = self.interface._wait_pose_goal_execution(req.group_name, req.goals.poses[waypoints_number-1], req.tolerance)
         else:
             rospy.logerr('Unknown goal type for group pose: {}'.format(req.goal_type))
             ok = False
