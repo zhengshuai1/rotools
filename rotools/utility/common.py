@@ -197,3 +197,19 @@ def get_param(name, value=None):
         return rospy.get_param(name)
     else:
         return value
+
+
+def set_param(name, value):
+    """Set ros param to param server
+
+    :param name: String Param name
+    :param value: Input value to be sent to ros param
+    :return:
+    """
+    private = "~%s" % name
+    if rospy.has_param(private):
+        return rospy.set_param(private, value)
+    elif rospy.has_param(name):
+        return rospy.set_param(name, value)
+    else:
+        raise NotImplementedError('There is no ros_param called {}'.format(name))
