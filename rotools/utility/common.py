@@ -30,6 +30,10 @@ def all_close(goal, actual, tolerance):
         return all_close(goal.pose, actual.pose, tolerance)
     elif type(goal) is GeometryMsg.Pose:
         return all_close(pose_to_list(goal), pose_to_list(actual), tolerance)
+    elif type(goal) is GeometryMsg.Point:
+        pose_to_list_g = [goal.x, goal.y, goal.z]
+        pose_to_list_a = [actual.x, actual.y, actual.z]
+        return all_close(pose_to_list_g, pose_to_list_a, tolerance)
     else:
         raise NotImplementedError('Goal type is {} while actual pose type is {}'.format(type(goal), type(actual)))
     return True

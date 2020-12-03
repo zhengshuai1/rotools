@@ -101,12 +101,12 @@ class MoveGroupInterface(object):
     
     def _wait_js_goal_execution(self, group_name, js_goal, tol):
         js_temp = self.get_joint_states_of_group(group_name)
-        cnt = 10
+        cnt = 20
         while not rospy.is_shutdown() and cnt:
-            rospy.sleep(0.05)
+            rospy.sleep(0.025)
             js_curr = self.get_joint_states_of_group(group_name)
-            if common.all_close(js_goal, js_curr, tol):
-                return True
+            # if common.all_close(js_goal, js_curr, tol):
+            #     return True
             if common.all_close(js_curr, js_temp, 0.001):
                 cnt -= 1
             else:
@@ -116,13 +116,14 @@ class MoveGroupInterface(object):
     def _wait_pose_goal_execution(self, group_name, pose_goal, tol):
         group = self._get_group_by_name(group_name)
         pose_temp = common.regularize_pose(group.get_current_pose().pose)
-        cnt = 10
+        cnt = 20
+        times = 1
         while not rospy.is_shutdown() and cnt:
-            rospy.sleep(0.05)
+            rospy.sleep(0.025)
             pose_curr = common.regularize_pose(group.get_current_pose().pose)
-            if common.all_close(pose_goal, pose_curr, tol):
-                return True
-            if common.all_close(pose_curr, pose_temp, 0.001):
+            # if common.all_close(pose_goal, pose_curr, tol):
+            #     return True
+            if common.all_close(pose_curr.position, pose_temp.position, 0.001):
                 cnt -= 1
             else:
                 pose_temp = pose_curr
@@ -514,7 +515,7 @@ class MoveGroupInterface(object):
             init_pose = abs_pose
         return self.build_absolute_path_for_group(group_name, abs_poses, stamp, avoid_collisions)
 
-    def execute_plan_for_group(self, group_name, plan, wait=True):
+    def execute_plan_for_group(self, group_name, plan, wait=False):
         group_id = self._get_group_id(group_name)
         assert group_id is not None
         return self.move_groups[group_id].execute(plan, wait)
