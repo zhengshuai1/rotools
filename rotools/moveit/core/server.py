@@ -2,8 +2,10 @@
 from __future__ import print_function
 
 import rospy
-
+ 
 from roport.srv import *
+
+from std_srvs.srv import SetBool, SetBoolResponse
 
 # make sure setting > export PYTHONPATH="${PYTHONPATH}:~/rotools" in bashrc
 import rotools.moveit.core.interface as interface
@@ -25,6 +27,9 @@ class MoveItServer(object):
 
         self._srv_get_pose = rospy.Service('get_group_pose', GetGroupPose, self.get_pose_handle)
         self._srv_get_js = rospy.Service('get_group_joint_states', GetGroupJointStates, self.get_js_handle)
+
+        ####################################################################################################
+        self._srv_get_running_state= rospy.Service('get_running_state', SetBool, self.get_running_state_handle)
 
         self._srv_group_position = rospy.Service(
             'execute_group_position', ExecuteGroupPosition, self.group_position_handle
@@ -93,6 +98,20 @@ class MoveItServer(object):
             resp.result_status = resp.FAILED
         return resp
 
+    ##############################################################################################
+    def get_running_state_handle(self,req):
+        if req.data:
+            self.interface.running_state = True
+            rospy.logerr('server handle: changing running state to true')
+        else:
+            self.interface.running_state = False
+            rospy.logerr('changing running state to false')
+        resp = SetBoolResponse()
+        resp.success = True
+        resp.message = 'Answer the request successfully'
+        return resp
+
+
     def group_shift_handle(self, req):
         ok = self.interface.group_shift(req.group_name, req.axis, req.goal)
         resp = ExecuteGroupShiftResponse()
@@ -132,6 +151,7 @@ class MoveItServer(object):
         return resp
 
     def group_many_poses_handle(self, req):
+        rospy.logerr('Start execute poses')
         if not req.tolerance:
             req.tolerance = 0.01
 

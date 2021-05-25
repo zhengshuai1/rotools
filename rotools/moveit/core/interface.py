@@ -42,6 +42,9 @@ class MoveGroupInterface(object):
         self.group_num = len(self.group_names)
         assert self.group_num >= 1
 
+        ####################################################################
+        self.running_state = True
+
         # We can get a list of all the groups in the robot:
         all_group_names = self.commander.get_group_names()
         for name in self.group_names:
@@ -98,10 +101,12 @@ class MoveGroupInterface(object):
             if name == group_name:
                 return self.move_groups[i]
         raise IndexError
-    
+
+    ######### origin block code ##########
+    '''
     def _wait_js_goal_execution(self, group_name, js_goal, tol):
         js_temp = self.get_joint_states_of_group(group_name)
-        cnt = 20
+        cnt = 50
         while not rospy.is_shutdown() and cnt:
             rospy.sleep(0.025)
             js_curr = self.get_joint_states_of_group(group_name)
@@ -112,22 +117,41 @@ class MoveGroupInterface(object):
             else:
                 js_temp = js_curr
         return True
-    
+    '''
+    ######## service block code ##########
+    '''
+    while (self.running_state):
+            rospy.sleep(0.025)
+        self.running_state = True
+        return True
+    '''
+
+    def _wait_js_goal_execution(self, group_name, pose_goal, tol):
+        while (self.running_state):
+            rospy.sleep(0.025)
+        self.running_state = True
+        return True
+
     def _wait_pose_goal_execution(self, group_name, pose_goal, tol):
-        group = self._get_group_by_name(group_name)
-        pose_temp = common.regularize_pose(group.get_current_pose().pose)
-        cnt = 20
-        times = 1
+        while (self.running_state):
+            rospy.sleep(0.025)
+        self.running_state = True
+        return True
+
+        '''
+        js_temp = self.get_joint_states_of_group(group_name)
+        cnt = 22
         while not rospy.is_shutdown() and cnt:
             rospy.sleep(0.025)
-            pose_curr = common.regularize_pose(group.get_current_pose().pose)
-            # if common.all_close(pose_goal, pose_curr, tol):
+            js_curr = self.get_joint_states_of_group(group_name)
+            # if common.all_close(js_goal, js_curr, tol):
             #     return True
-            if common.all_close(pose_curr.position, pose_temp.position, 0.001):
+            if common.all_close(js_curr, js_temp, 0.001):
                 cnt -= 1
             else:
-                pose_temp = pose_curr
+                js_temp = js_curr
         return True
+        '''
 
     def get_active_joint_names_of_all_groups(self):
         ret = []
@@ -181,7 +205,6 @@ class MoveGroupInterface(object):
 
     def group_go_to_joint_states(self, group_name, goal, tolerance=0.01):
         """Set the joint states of a group as goal.
-
         :param group_name: str Controlled group name
         :param goal: list Joint states
         :param tolerance: float
@@ -522,7 +545,6 @@ class MoveGroupInterface(object):
 
     def build_absolute_paths_for_all(self, all_poses, all_stamps=None, avoid_collisions=True):
         """
-
         :param all_poses: List[List[Pose]] or List[PoseArray]
         :param all_stamps:
         :param avoid_collisions:
